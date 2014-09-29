@@ -84,6 +84,7 @@ class BinaryTerm(Bool):
 class And(BinaryTerm):
     op = '&'
     def normalize(self):
+        if self._mark: return self
         # a & a -> a
         if self.fst == self.snd:
             return self.fst.normalize()
@@ -128,11 +129,13 @@ class And(BinaryTerm):
         if right2!=args1:
             return (args0 & right2).normalize()
 
+        self._mark = True
         return self
 
 class Or(BinaryTerm):
     op = '|'
     def normalize(self):
+        if self._mark: return self
         # a | a -> a
         if self.fst == self.snd:
             return self.fst.normalize()
@@ -167,6 +170,7 @@ class Or(BinaryTerm):
         if right2!=args1:
             return (args0 | right2).normalize()
 
+        self._mark = True
         return self
 
 class Not(UnaryTerm):
@@ -186,6 +190,6 @@ class Not(UnaryTerm):
         # ~~a -> a
         elif isinstance(arg, Not):
             return arg.child.normalize()
-        else:
-            return ~(arg.normalize())
+
+        return ~(arg.normalize())
 
