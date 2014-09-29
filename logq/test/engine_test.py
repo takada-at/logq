@@ -1,3 +1,5 @@
+# -*- coding: utf-8 -*-
+from __future__ import division, print_function, absolute_import
 from .. import engine
 
 def test_NFA():
@@ -33,6 +35,6 @@ def test_NFA():
     dfa = engine.convert_nfa2dfa(nfa, fac)
     assert dfa
     table = dfa.to_table()
-    print table
+    print(table)
     assert 8==len(table)
     assert ['', 'a', 'b', 'c', 'd'] == table[0]

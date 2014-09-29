@@ -1,4 +1,5 @@
-# coding:utf-8
+# -*- coding: utf-8 -*-
+from __future__ import division, print_function, absolute_import
 
 class StateFactory(object):
     def __init__(self, init=0):
@@ -75,7 +76,6 @@ def _convertlink(nfa):
     newmap = dict()
     while stack:
         curstates = stack.pop()
-        print curstates
         newstates = dict()
         for nfastate in curstates:
             links = nfa.get_links(nfastate, input_=None, exclusive='')
