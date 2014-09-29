@@ -3,13 +3,13 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 class Bool(object):
     @classmethod
-    def create(cls, string):
+    def create(cls, ite):
         u"""
         >>> a, b, c = Bool.create('abc')
         >>> a | b
         a | b
         """
-        return [Atomic(c) for c in string]
+        return [Atomic(c) for c in ite]
 
     def __init__(self, *args):
         self.args = args
@@ -17,12 +17,14 @@ class Bool(object):
     @property
     def atomic(self):
         return isinstance(self, Atomic)
-    def expand(self):
+    def normalize(self):
         return self
     def __repr__(self):
         return self.name
     def __eq__(self, other):
         return self.name == other
+    def __ne__(self, other):
+        return self.name != other
     def __and__(self, other):
         return And(self, other)
     def __or__(self, other):
@@ -43,74 +45,149 @@ class UnaryTerm(Bool):
     op = ''
     def __init__(self, *args):
         self.args = args
-        self.name = '{} {}'.format(self.op, args[0])
+        self.child = args[0]
+        if self.child.atomic:
+            child = self.child
+        else:
+            child = '({})'.format(self.child)
+
+        self.name = '{}{}'.format(self.op, child)
     def __contains__(self, other):
         return other in self.args
 
 class BinaryTerm(Bool):
     op = ''
     def __init__(self, *args):
+        def format(term):
+            if term.atomic or isinstance(term, UnaryTerm):
+                return str(term)
+            elif isinstance(self, Or) and isinstance(term, And):
+                return str(term)
+            else:
+                return "({})".format(term)
+
         self.args = args
         self.fst = args[0]
         self.snd = args[1]
-        self.name = '{} {} {}'.format(self.fst, self.op, self.snd)
+        fst = format(self.fst)
+        snd = format(self.snd)
+        self.name = '{} {} {}'.format(fst, self.op, snd)
     def __contains__(self, other):
         return other in self.args
     def __eq__(self, other):
         if isinstance(other, self.__class__):
-            return (self.fst == other.fst and self.snd == other.snd) or (self.fst == other.snd and self.snd == other.fst)
+            this = self
+            return (this.fst == other.fst and this.snd == other.snd) or (this.fst == other.snd and this.snd == other.fst)
         else:
             return False
+    def __ne__(self, other):
+        return not(self==other)
 
 class And(BinaryTerm):
     op = '&'
-    def expand(self):
-        """
-        (A + B) C
-        -> AC + BC
-
-        A (B + C)
-        -> A B + A C
-
-        (A + B) (C + D)
-        -> AC + AD + BC + BD
-        """
+    def normalize(self):
         # a & a -> a
         if self.fst == self.snd:
-            return self.fst
+            return self.fst.normalize()
         # a & (a | c) -> a
         if isinstance(self.snd, Or) and self.fst in self.snd:
-            return self.fst
+            return self.fst.normalize()
+        # (a | b) & a -> a
         if isinstance(self.fst, Or) and self.snd in self.fst:
-            return self.snd
+            return self.snd.normalize()
 
-        args0 = self.args[0].expand()
-        args1 = self.args[1].expand()
-        if args0 == args1:
-            return args0
-
+        args0 = self.fst
+        args1 = self.snd
+        # (A | B) & C -> A & C | B & C
         if isinstance(args0, Or):
-            return Or(And(args0.fst, args1).expand(),
-                      And(args0.snd, args1).expand())
+            left   = (args0.fst & args1).normalize()
+            right  = (args0.snd & args1).normalize()
+            return (left | right).normalize()
+        # A & (B | C) -> A & B | A & C
         elif isinstance(args1, Or):
-            return Or(And(args0, args1.fst).expand(),
-                      And(args0, args1.snd).expand())
-        else:
-            return self
+            left   = (args0 & args1.fst).normalize()
+            right  = (args0 & args1.snd).normalize()
+            return (left | right).normalize()
+        # A & (B & C) -> (A & B) & C
+        elif isinstance(args1, And):
+            left = (args0 & args1.fst).normalize()
+            right = args1.snd.normalize()
+            return (left & right).normalize()
+        # (A & B) & C -> A & (B & C)
+        elif isinstance(args0, And):
+            left = args0.fst
+            right = (args0.snd & args1)
+            # try A & (B & C)
+            right2 = right.normalize()
+            if right != right2:
+                left2 = left.normalize()
+                return (left2 & right2).normalize()
+
+        left2 = args0.normalize()
+        if left2!=args0:
+            return (left2 & args1).normalize()
+        right2 = args1.normalize()
+        if right2!=args1:
+            return (args0 & right2).normalize()
+
+        return self
 
 class Or(BinaryTerm):
     op = '|'
-    def expand(self):
+    def normalize(self):
         # a | a -> a
         if self.fst == self.snd:
-            return self.fst
+            return self.fst.normalize()
         # a | (a & c) -> a
         if isinstance(self.snd, And) and self.fst in self.snd:
-            return self.fst
+            return self.fst.normalize()
+        # (a & c) | a -> a
         if isinstance(self.fst, And) and self.snd in self.fst:
-            return self.snd
+            return self.snd.normalize()
+
+        args0 = self.fst
+        args1 = self.snd
+        # A | (B | C) -> (A | B) | C
+        if isinstance(args1, Or):
+            left = (args0 | args1.fst).normalize()
+            right = args1.snd.normalize()
+            return (left  | right).normalize()
+        # (A | B) | C -> A | (B | C)
+        elif isinstance(args0, Or):
+            left = args0.fst
+            right = (args0.snd | args1)
+            # try A | (B | C)
+            right2 = right.normalize()
+            if right != right2:
+                left2 = left.normalize()
+                return (left2 | right2).normalize()
+
+        left2 = args0.normalize()
+        if left2!=args0:
+            return (left2 | args1).normalize()
+        right2 = args1.normalize()
+        if right2!=args1:
+            return (args0 | right2).normalize()
 
         return self
 
 class Not(UnaryTerm):
     op = '~'
+    def normalize(self):
+        arg = self.child
+        # ~(a & b) -> ~a | ~b
+        if isinstance(arg, And):
+            left  = ~arg.fst
+            right = ~arg.snd
+            return (left.normalize() | right.normalize()).normalize()
+        # ~(a | b) -> ~a & ~b
+        elif isinstance(arg, Or):
+            left  = ~arg.fst
+            right = ~arg.snd
+            return (left.normalize() & right.normalize()).normalize()
+        # ~~a -> a
+        elif isinstance(arg, Not):
+            return arg.child.normalize()
+        else:
+            return ~(arg.normalize())
+
