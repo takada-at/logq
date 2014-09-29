@@ -35,6 +35,14 @@ class Bool(object):
         return self==other
     def __hash__(self):
         return ~hash(self.name)
+    def format(self, term):
+        if term.atomic or isinstance(term, UnaryTerm):
+            return str(term)
+        elif isinstance(self, Or) and isinstance(term, And):
+            return str(term)
+        else:
+            return "({})".format(term)
+
 
 class Atomic(Bool):
     def __init__(self, *args):
@@ -46,32 +54,22 @@ class UnaryTerm(Bool):
     def __init__(self, *args):
         self.args = args
         self.child = args[0]
-        if self.child.atomic:
-            child = self.child
-        else:
-            child = '({})'.format(self.child)
-
+        child = self.format(self.child)
         self.name = '{}{}'.format(self.op, child)
+        self._mark = False
     def __contains__(self, other):
         return other in self.args
 
 class BinaryTerm(Bool):
     op = ''
     def __init__(self, *args):
-        def format(term):
-            if term.atomic or isinstance(term, UnaryTerm):
-                return str(term)
-            elif isinstance(self, Or) and isinstance(term, And):
-                return str(term)
-            else:
-                return "({})".format(term)
-
         self.args = args
         self.fst = args[0]
         self.snd = args[1]
-        fst = format(self.fst)
-        snd = format(self.snd)
+        fst = self.format(self.fst)
+        snd = self.format(self.snd)
         self.name = '{} {} {}'.format(fst, self.op, snd)
+        self._mark = False
     def __contains__(self, other):
         return other in self.args
     def __eq__(self, other):
