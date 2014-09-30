@@ -139,6 +139,7 @@ class And(BinaryTerm):
         >>> ((a|b) & a).normalize()
         a
         >>> ((a|b) & b) & c).normalize()
+        a & b & c | b & c
         """
         if self._mark: return self
         children = self.children()
@@ -220,26 +221,124 @@ class Not(UnaryTerm):
         self._mark = True
         return self
 
-def step0_minterms(term):
+class LogicalTree(object):
+    def __init__(self, ids, expr):
+        assert isinstance(ids, set)
+        self.ids   = ids
+        self.expr  = expr
+        self._merged = False
+        self.mark  = None
+    def compair(self, other):
+        diff = _compair(self.expr, other.expr)
+        if len(diff)==1:
+            return self.merge(diff, other)
+        else:
+            return None
+    def merge(self, diff, other):
+        merged = self.expr[:]
+        expr = merged[diff[0]] = '_'
+        ids  = self.ids | other.ids
+        return self.__class__(ids, expr)
+
+def quine_mccluskey(term):
     term = term.normalize()
     disjuncts = term.children()
     variables = list(term.variables)
-    variables.sort()
+    variables.sort(lambda x,y: cmp(x.name, y.name))
+    minterns = step0_minterms(variables, term)
+    # convert to list of 1/0
+    bins = tobin(variables, minterns)
+    prime_implicants = step1_prime_implicants(bins)
+
+def step0_minterms(variables, term):
     newdisjuncts = []
+    disjuncts = term.children()
     for disjunct in disjuncts:
-        L = [disjunct]
+        L = [disjunct.children()]
         for var in variables:
             L2 = []
-            for tmp in L:
+            for term in L:
                 # A & B -> A & B & C | A & B & ~C
-                if var not in tmp:
-                    L2.append(tmp&var)
-                    L2.append(tmp&~var)
+                if var not in term and ~var not in term:
+                    L2.append(term + [var])
+                    L2.append(term + [~var])
                 else:
-                    L2.append(tmp)
+                    L2.append(term)
 
             L = L2
 
         newdisjuncts += L
 
-    return newdisjuncts
+    return _normalize_terms(variables, newdisjuncts)
+
+def _normalize_terms(variables, terms):
+    res = []
+    cache = set()
+    for disjunct in terms:
+        terms  = []
+        for var in variables:
+            if ~var in disjunct:
+                terms.append(~var)
+            elif var in disjunct:
+                terms.append(var)
+
+        tm = reduce(operator.and_, terms)
+        # delete not unique terms
+        if tm.name in cache:
+            continue
+
+        cache.add(tm.name)
+        res.append(tm)
+
+    return res
+
+def tobin(variables, term):
+    res = []
+    for var in variables:
+        children = term.children()
+        if ~var in children:
+            res.append(0)
+        elif var in children:
+            res.append(1)
+
+    return res
+
+def step1_prime_implicants(terms):
+    trees = [LogicalTree({idx}, term) for idx, term in enumerate(terms)]
+    merged, _ = _merge(trees)
+    primes = []
+    while merged:
+        merged, marked = _merge(merged, enable_mark=True)
+        primes += marked
+
+    return primes
+
+def _merge(terms, enable_mark=False):
+    pairs = []
+    for term0 in terms:
+        for term1 in terms[i+1:]:
+            merged = term0.compair(term1)
+            if merged:
+                if enable_mark:
+                    term0._merged = True
+                    term1._merged = True
+
+                pairs.append(merged)
+
+    if enable_mark:
+        marked = [term for term in terms if not term._merged]
+    else:
+        marked = None
+
+    return (pairs, marked)
+
+def _compair(x,y):
+    res = []
+    for i in range(len(x)):
+        if x[i]!=y[i]:
+            res.append(res)
+
+    return res
+
+def step2_essential_prime_implicants(implicants):
+    pass

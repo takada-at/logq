@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 from __future__ import absolute_import, division, print_function, unicode_literals
 
-from .. import qm
+from .. import logic as qm
 
 def test_Bool():
     a, b, c, d = qm.Bool.create('abcd')
@@ -79,12 +79,19 @@ def test_normalize():
     r2 = r.normalize()
     assert r2 == a & b & c
 
-def test_disjunctlist():
-    a, b, c, d = qm.Bool.create('abcd')
-    L = qm.disjunctlist(((a | b) | c) | d)
-    assert [a, b, c, d] == L
-
 def test_step0_minterms():
     a, b, c, d = qm.Bool.create('abcd')
-    f = a & b | b & c 
+    term = a & b | b & c
+    term = term.normalize()
+    assert a & b | b & c == term
+    disjuncts = term.children()
+    variables = list(term.variables)
+    variables.sort(lambda x,y: cmp(x.name, y.name))
     # -> a & b & c, a & b & ~c, b & c & a, b & c & ~a
+    minterns = qm.step0_minterms(variables, term)
+    print(minterns)
+    assert 3 == len(minterns)
+    assert a & b & c  == minterns[0]
+    assert a & b & ~c == minterns[1]
+    assert ~a & b & c == minterns[2]
+
