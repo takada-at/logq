@@ -84,14 +84,21 @@ def test_step0_minterms():
     term = a & b | b & c
     term = term.normalize()
     assert a & b | b & c == term
-    disjuncts = term.children()
-    variables = list(term.variables)
-    variables.sort(lambda x,y: cmp(x.name, y.name))
-    # -> a & b & c, a & b & ~c, b & c & a, b & c & ~a
-    minterns = qm.step0_minterms(variables, term)
+    obj = qm.QuineMcCluskey(term)
+    minterns = obj.step0_minterms()
     print(minterns)
     assert 3 == len(minterns)
-    assert a & b & c  == minterns[0]
-    assert a & b & ~c == minterns[1]
-    assert ~a & b & c == minterns[2]
+    assert (1, 1, 1) == minterns[0] # a & b & c
+    assert (1, 1, 0) == minterns[1] # a & b & ~c
+    assert (0, 1, 1) == minterns[2] # ~a & b & c
 
+def test_step1_prime_implicants():
+    a, b, c, d = qm.Bool.create('abcd')
+    obj = qm.QuineMcCluskey(a)
+    T = [(0,1,0,0), (1,0,0,0), (1,0,0,1), (1,0,1,0), (1,1,1,0), (1,0,1,1), (1,1,0,0), (1,1,1,1)]
+    primes = obj.step1_prime_implicants(T)
+    c = '_'
+    assert 4 == len(primes)
+    print(primes)
+    answer = {(c,1,0,0), (1,0,c,c), (1,c,c,0), (1,c,1,c)}
+    assert answer == set(p.expr for p in primes)

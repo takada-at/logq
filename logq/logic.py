@@ -221,124 +221,164 @@ class Not(UnaryTerm):
         self._mark = True
         return self
 
-class LogicalTree(object):
+class MergeTree(object):
+    CHAR = '_'
     def __init__(self, ids, expr):
-        assert isinstance(ids, set)
-        self.ids   = ids
-        self.expr  = expr
+        self.ids   = ids  # {0,}
+        self.expr  = expr # [0, 1, 1]
         self._merged = False
         self.mark  = None
-    def compair(self, other):
-        diff = _compair(self.expr, other.expr)
-        if len(diff)==1:
-            return self.merge(diff, other)
+        self._len = len([c for c in expr if c!= self.CHAR])
+    def __len__(self):
+        return self._len
+    def boolean(self, variables):
+        res = []
+        for i, var in enumerate(variables):
+            if self.expr[i]==0: res.add(~var)
+            elif self.expr[i]==1: res.add(var)
+
+        return reduce(operator.and_, res)
+
+    def try_merge(self, other):
+        distance, merged = self._merge(self.expr, other.expr)
+        if distance<=1:
+            ids  = self.ids | other.ids
+            return self.__class__(ids, tuple(merged))
         else:
             return None
-    def merge(self, diff, other):
-        merged = self.expr[:]
-        expr = merged[diff[0]] = '_'
-        ids  = self.ids | other.ids
-        return self.__class__(ids, expr)
+    def __repr__(self):
+        val = "".join(map(unicode, self.expr))
+        idx = ", ".join(map(unicode, self.ids))
+        return "m({})={}".format(idx, val)
+    def _merge(self, x,y):
+        merged = list(x[:])
+        distance = 0
+        c = self.CHAR
+        for i in range(len(x)):
+            if x[i]!=y[i]:
+                merged[i]=c
+                distance += 1
 
-def quine_mccluskey(term):
-    term = term.normalize()
-    disjuncts = term.children()
-    variables = list(term.variables)
-    variables.sort(lambda x,y: cmp(x.name, y.name))
-    minterns = step0_minterms(variables, term)
-    # convert to list of 1/0
-    bins = tobin(variables, minterns)
-    prime_implicants = step1_prime_implicants(bins)
+        return (distance, merged)
 
-def step0_minterms(variables, term):
-    newdisjuncts = []
-    disjuncts = term.children()
-    for disjunct in disjuncts:
-        L = [disjunct.children()]
-        for var in variables:
-            L2 = []
-            for term in L:
-                # A & B -> A & B & C | A & B & ~C
-                if var not in term and ~var not in term:
-                    L2.append(term + [var])
-                    L2.append(term + [~var])
-                else:
-                    L2.append(term)
+class QuineMcCluskey(object):
+    def __init__(self, term):
+        self.term = term.normalize()
+        variables = list(term.variables)
+        variables.sort(lambda x,y: cmp(x.name, y.name))
+        self.variables = variables
+    def compulte(self):
+        # 最小項標準形への変換
+        minterns = self.step0_minterms()
+        prime_implicants = self.step1_prime_implicants(bins)
+    def step0_minterms(self):
+        """
+        最小項標準形への変換
+        """
+        variables = self.variables
+        disjuncts = self.term.children()
+        newdisjuncts = []
+        for disjunct in disjuncts:
+            L = [disjunct.children()]
+            for var in variables:
+                L2 = []
+                for term in L:
+                    # A & B -> A & B & C | A & B & ~C
+                    if var not in term and ~var not in term:
+                        L2.append(term + [var])
+                        L2.append(term + [~var])
+                    else:
+                        L2.append(term)
 
-            L = L2
+                L = L2
 
-        newdisjuncts += L
+            newdisjuncts += L
 
-    return _normalize_terms(variables, newdisjuncts)
+        return self._normalize_terms(newdisjuncts)
+    def step1_prime_implicants(self, terms):
+        """
+        主項を見つける
+        """
+        trees = [MergeTree({idx}, term) for idx, term in enumerate(terms)]
+        merged, _ = self._merge(trees)
+        primes = []
+        while merged:
+            merged, marked = self._merge(merged, enable_mark=True)
+            primes += marked
 
-def _normalize_terms(variables, terms):
-    res = []
-    cache = set()
-    for disjunct in terms:
-        terms  = []
-        for var in variables:
-            if ~var in disjunct:
-                terms.append(~var)
-            elif var in disjunct:
-                terms.append(var)
+        return primes
+    def step2_essential_prime_implicants(self, implicants):
+        """
+        必須項を見つける
+        """
+        table = dict()
+        names = dict()
+        name2t= dict()
+        c = 0
+        for term in implicants:
+            # naming terms
+            name = "p{}".format(c)
+            names[id(term)] = name
+            name2t[name] = term
+            c+=1
+            for id_ in term.ids:
+                table.setdefault(id_, set())
+                table[id_].add(term)
 
-        tm = reduce(operator.and_, terms)
-        # delete not unique terms
-        if tm.name in cache:
-            continue
+        essentials = []
+        variables = self.variables
+        functions = []
+        for id_, terms in table.items():
+            if len(terms)==1:
+                essentials += terms
+                continue
+            else:
+                forms = [Atomic(names[id(term)]) for term in terms]
+                boolean = reduce(operator.or_, forms)
+                # ex. p0 | p1
+                functions.append(boolean)
 
-        cache.add(tm.name)
-        res.append(tm)
+        # ex. (p0 | p1) & (p2 | p3)
+        sums = reduce(operator.and_, functions)
+        sums = sums.normalize()
+        ranks = []
+        for disjunct in sums.children():
+            rank = sum(len(name2t[t.name]) for t in disjunct.children())
+            ranks.append(len(disjunct.children()), rank, disjunct)
 
-    return res
+        ranks.sort()
+        essentials += [name2t[t.name] for t in ranks[0].children()]
+        return essentials
 
-def tobin(variables, term):
-    res = []
-    for var in variables:
-        children = term.children()
-        if ~var in children:
-            res.append(0)
-        elif var in children:
-            res.append(1)
+    def _normalize_terms(self, terms):
+        variables = self.variables
+        cache = set()
+        res   = []
+        for disjunct in terms:
+            # sort order
+            disjunct = tuple(1 if v in disjunct else 0 for v in variables)
+            # delete non unique terms
+            if disjunct in cache:
+                continue
+            cache.add(disjunct)
+            res.append(disjunct)
 
-    return res
+        return res
+    def _merge(self, terms, enable_mark=False):
+        pairs = []
+        for i, term0 in enumerate(terms):
+            for term1 in terms[i+1:]:
+                merged = term0.try_merge(term1)
+                if merged:
+                    if enable_mark:
+                        term0._merged = True
+                        term1._merged = True
 
-def step1_prime_implicants(terms):
-    trees = [LogicalTree({idx}, term) for idx, term in enumerate(terms)]
-    merged, _ = _merge(trees)
-    primes = []
-    while merged:
-        merged, marked = _merge(merged, enable_mark=True)
-        primes += marked
+                    pairs.append(merged)
 
-    return primes
+        if enable_mark:
+            marked = [term for term in terms if not term._merged]
+        else:
+            marked = None
 
-def _merge(terms, enable_mark=False):
-    pairs = []
-    for term0 in terms:
-        for term1 in terms[i+1:]:
-            merged = term0.compair(term1)
-            if merged:
-                if enable_mark:
-                    term0._merged = True
-                    term1._merged = True
-
-                pairs.append(merged)
-
-    if enable_mark:
-        marked = [term for term in terms if not term._merged]
-    else:
-        marked = None
-
-    return (pairs, marked)
-
-def _compair(x,y):
-    res = []
-    for i in range(len(x)):
-        if x[i]!=y[i]:
-            res.append(res)
-
-    return res
-
-def step2_essential_prime_implicants(implicants):
-    pass
+        return (pairs, marked)
