@@ -17,6 +17,14 @@ class Bool(object):
     @property
     def atomic(self):
         return isinstance(self, Atomic)
+
+    @property
+    def variables(self):
+        if self.atomic:
+            return set([self])
+        else:
+            return reduce(lambda x,y: x | y.variables, self.args, set())
+
     def normalize(self):
         return self
     def __repr__(self):
@@ -43,11 +51,10 @@ class Bool(object):
         else:
             return "({})".format(term)
 
-
 class Atomic(Bool):
     def __init__(self, *args):
-        self.args = args
-        self.name = self.args[0]
+        self.name = args[0]
+        self.args = []
 
 class UnaryTerm(Bool):
     op = ''
@@ -107,13 +114,8 @@ class And(BinaryTerm):
             left   = (args0 & args1.fst).normalize()
             right  = (args0 & args1.snd).normalize()
             return (left | right).normalize()
-        # A & (B & C) -> (A & B) & C
-        elif isinstance(args1, And):
-            left = (args0 & args1.fst).normalize()
-            right = args1.snd.normalize()
-            return (left & right).normalize()
         # (A & B) & C -> A & (B & C)
-        elif isinstance(args0, And):
+        if isinstance(args0, And):
             left = args0.fst
             right = (args0.snd & args1)
             # try A & (B & C)
@@ -121,13 +123,23 @@ class And(BinaryTerm):
             if right != right2:
                 left2 = left.normalize()
                 return (left2 & right2).normalize()
+            # try (A & C) & B
+            left = args0.fst & args1
+            left2 = left.normalize()
+            if left != left2:
+                right2 = args0.snd
+                return (left2 & right2).normalize()
+
+        # A & (B & C) -> (A & B) & C
+        if isinstance(args1, And):
+            left = (args0 & args1.fst).normalize()
+            right = args1.snd.normalize()
+            return (left & right).normalize()
 
         left2 = args0.normalize()
-        if left2!=args0:
-            return (left2 & args1).normalize()
         right2 = args1.normalize()
-        if right2!=args1:
-            return (args0 & right2).normalize()
+        if left2!=args0 or right2!=args1:
+            return (left2 & right2).normalize()
 
         self._mark = True
         return self
@@ -148,13 +160,8 @@ class Or(BinaryTerm):
 
         args0 = self.fst
         args1 = self.snd
-        # A | (B | C) -> (A | B) | C
-        if isinstance(args1, Or):
-            left = (args0 | args1.fst).normalize()
-            right = args1.snd.normalize()
-            return (left  | right).normalize()
-        # (A | B) | C -> A | (B | C)
-        elif isinstance(args0, Or):
+        # (A | B) | C
+        if isinstance(args0, Or):
             left = args0.fst
             right = (args0.snd | args1)
             # try A | (B | C)
@@ -162,13 +169,23 @@ class Or(BinaryTerm):
             if right != right2:
                 left2 = left.normalize()
                 return (left2 | right2).normalize()
+            # try (A | C) | B
+            left = args0.fst | args1
+            left2 = left.normalize()
+            if left != left2:
+                right2 = args0.snd
+                return (left2 | right2).normalize()
+
+        # A | (B | C) -> (A | B) | C
+        if isinstance(args1, Or):
+            left = (args0 | args1.fst).normalize()
+            right = args1.snd.normalize()
+            return (left  | right).normalize()
 
         left2 = args0.normalize()
-        if left2!=args0:
-            return (left2 | args1).normalize()
         right2 = args1.normalize()
-        if right2!=args1:
-            return (args0 | right2).normalize()
+        if left2!=args0 or right2!=args1:
+            return (left2 | right2).normalize()
 
         self._mark = True
         return self
@@ -176,6 +193,7 @@ class Or(BinaryTerm):
 class Not(UnaryTerm):
     op = '~'
     def normalize(self):
+        if self._mark: return self
         arg = self.child
         # ~(a & b) -> ~a | ~b
         if isinstance(arg, And):
@@ -191,5 +209,51 @@ class Not(UnaryTerm):
         elif isinstance(arg, Not):
             return arg.child.normalize()
 
-        return ~(arg.normalize())
+        tmp = arg.normalize()
+        if tmp!=arg:
+            return ~tmp
 
+        self._mark = True
+        return self
+
+def disjunctlist(form):
+    u"""
+    >>> a, b, c, d = Bool.create('abcd')
+    >>> disjunctlist(((a | b) | c) | d)
+    [a, b, c, d]
+    """
+    # ((a | b) | c) | d
+    ptr = form
+    disjuncts = []
+    while ptr:
+        if isinstance(ptr, Or):
+            disjuncts.append(ptr.snd)
+            ptr = ptr.fst
+        else:
+            disjuncts.append(ptr)
+            ptr = None
+
+    disjuncts.reverse()
+    return disjuncts
+
+def step0_minterms(term):
+    term = term.normalize()
+    disjuncts = disjunctlist(term)
+    variables = term.variables
+    newdisjuncts = []
+    for disjunct in disjuncts:
+        L = [disjunct]
+        for var in variables:
+            L2 = []
+            for tmp in L:
+                if var not in tmp:
+                    L2.append(tmp&var)
+                    L2.append(tmp&~var)
+                else:
+                    L2.append(tmp)
+
+            L = L2
+
+        newdisjuncts += L
+
+    return newdisjuncts
