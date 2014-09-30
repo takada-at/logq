@@ -2,6 +2,12 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 import operator
 
+def pairs(L):
+    leng = len(L)
+    for idx0 in range(leng-1):
+        for idx1 in range(idx0+1, leng):
+            yield idx0, idx1, L[idx0], L[idx1]
+
 class Bool(object):
     @classmethod
     def create(cls, ite):
@@ -112,18 +118,15 @@ class BinaryTerm(Bool):
         marks = set()
         if isinstance(self, And): dual = Or
         elif isinstance(self, Or): dual = And
-        for idx0 in range(len(children)-1):
-            x = children[idx0]
-            for idx1 in range(idx0+1, len(children)):
-                y = children[idx1]
-                # A & A -> A
-                # A | A -> A
-                if x == y: marks.add(idx1)
-                # (A|B) & A -> A
-                elif isinstance(x, dual) and y in x: marks.add(idx0)
-                # A & (A|B) -> A
-                # A | (A&B) -> A
-                elif isinstance(y, dual) and x in y: marks.add(idx1)
+        for idx0, idx1, x, y in pairs(children):
+            # A & A -> A
+            # A | A -> A
+            if x == y: marks.add(idx1)
+            # (A|B) & A -> A
+            elif isinstance(x, dual) and y in x: marks.add(idx0)
+            # A & (A|B) -> A
+            # A | (A&B) -> A
+            elif isinstance(y, dual) and x in y: marks.add(idx1)
 
         return [c for idx, c in enumerate(children) if idx not in marks]
 
@@ -226,8 +229,6 @@ class MergeTree(object):
     def __init__(self, ids, expr):
         self.ids   = ids  # {0,}
         self.expr  = expr # [0, 1, 1]
-        self._merged = False
-        self.mark  = None
         self._len = len([c for c in expr if c!= self.CHAR])
     def __len__(self):
         return self._len
@@ -238,7 +239,6 @@ class MergeTree(object):
             elif self.expr[i]==1: res.add(var)
 
         return reduce(operator.and_, res)
-
     def try_merge(self, other):
         distance, merged = self._merge(self.expr, other.expr)
         if distance<=1:
@@ -303,7 +303,7 @@ class QuineMcCluskey(object):
         merged, _ = self._merge(trees)
         primes = []
         while merged:
-            merged, marked = self._merge(merged, enable_mark=True)
+            merged, marked = self._merge(merged)
             primes += marked
 
         return primes
@@ -364,21 +364,15 @@ class QuineMcCluskey(object):
             res.append(disjunct)
 
         return res
-    def _merge(self, terms, enable_mark=False):
-        pairs = []
-        for i, term0 in enumerate(terms):
-            for term1 in terms[i+1:]:
-                merged = term0.try_merge(term1)
-                if merged:
-                    if enable_mark:
-                        term0._merged = True
-                        term1._merged = True
+    def _merge(self, terms):
+        mergedterms = set()
+        pairl = []
+        for i, j, term0, term1 in pairs(terms):
+            merged = term0.try_merge(term1)
+            if merged:
+                mergedterms.add(i)
+                mergedterms.add(j)
+                pairl.append(merged)
 
-                    pairs.append(merged)
-
-        if enable_mark:
-            marked = [term for term in terms if not term._merged]
-        else:
-            marked = None
-
-        return (pairs, marked)
+        marked = [term for i, term in enumerate(terms) if i not in mergedterms]
+        return (pairl, marked)
