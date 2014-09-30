@@ -220,36 +220,18 @@ class Not(UnaryTerm):
         self._mark = True
         return self
 
-def disjunctlist(form):
-    u"""
-    >>> a, b, c, d = Bool.create('abcd')
-    >>> disjunctlist(((a | b) | c) | d)
-    [a, b, c, d]
-    """
-    # ((a | b) | c) | d
-    ptr = form
-    disjuncts = []
-    while ptr:
-        if isinstance(ptr, Or):
-            disjuncts.append(ptr.snd)
-            ptr = ptr.fst
-        else:
-            disjuncts.append(ptr)
-            ptr = None
-
-    disjuncts.reverse()
-    return disjuncts
-
 def step0_minterms(term):
     term = term.normalize()
-    disjuncts = disjunctlist(term)
-    variables = term.variables
+    disjuncts = term.children()
+    variables = list(term.variables)
+    variables.sort()
     newdisjuncts = []
     for disjunct in disjuncts:
         L = [disjunct]
         for var in variables:
             L2 = []
             for tmp in L:
+                # A & B -> A & B & C | A & B & ~C
                 if var not in tmp:
                     L2.append(tmp&var)
                     L2.append(tmp&~var)
