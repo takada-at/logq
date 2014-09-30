@@ -11,6 +11,12 @@ def test_Bool():
     r = a & b & c & (d | a)
     assert {a, b, c, d} == r.variables
 
+    r = (b & c) & d
+    assert [b, c, d] == r.children()
+
+    r = a | a & c
+    assert [a] == r.filter_children(r.children())
+
 def test_normalize():
     a, b, c, d = qm.Bool.create('abcd')
     r = a | b
@@ -33,7 +39,6 @@ def test_normalize():
     #->a | (b & a | a & c)
     #->a | b & c
     assert r.normalize() == a | b & c
-    assert r.normalize().name == 'a | b & c'
 
     r = ~ (a & b)
     # -> ~a | ~b
@@ -79,7 +84,7 @@ def test_disjunctlist():
     L = qm.disjunctlist(((a | b) | c) | d)
     assert [a, b, c, d] == L
 
-def test_step0_minterms:
+def test_step0_minterms():
     a, b, c, d = qm.Bool.create('abcd')
     f = a & b | b & c 
     # -> a & b & c, a & b & ~c, b & c & a, b & c & ~a

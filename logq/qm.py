@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 from __future__ import absolute_import, division, print_function, unicode_literals
+import operator
 
 class Bool(object):
     @classmethod
@@ -77,6 +78,26 @@ class BinaryTerm(Bool):
         snd = self.format(self.snd)
         self.name = '{} {} {}'.format(fst, self.op, snd)
         self._mark = False
+    def children(self):
+        """
+        >>> a, b, c, d = Bool.create('abcd')
+        >>> ((b & c) & d).children()
+        [b, c, d]
+        """
+        klass = self.__class__
+        if not isinstance(self.fst, klass) and not isinstance(self.snd, klass):
+            return [self.fst, self.snd]
+        if isinstance(self.fst, klass):
+            children = self.fst.children()
+        else:
+            children = [self.fst]
+
+        if isinstance(self.snd, klass):
+            children += self.snd.children()
+        else:
+            children += [self.snd]
+
+        return children
     def __contains__(self, other):
         return other in self.args
     def __eq__(self, other):
@@ -87,59 +108,63 @@ class BinaryTerm(Bool):
             return False
     def __ne__(self, other):
         return not(self==other)
+    def filter_children(self, children):
+        marks = set()
+        if isinstance(self, And): dual = Or
+        elif isinstance(self, Or): dual = And
+        for idx0 in range(len(children)-1):
+            x = children[idx0]
+            for idx1 in range(idx0+1, len(children)):
+                y = children[idx1]
+                # A & A -> A
+                # A | A -> A
+                if x == y: marks.add(idx1)
+                # (A|B) & A -> A
+                elif isinstance(x, dual) and y in x: marks.add(idx0)
+                # A & (A|B) -> A
+                # A | (A&B) -> A
+                elif isinstance(y, dual) and x in y: marks.add(idx1)
+
+        return [c for idx, c in enumerate(children) if idx not in marks]
 
 class And(BinaryTerm):
     op = '&'
     def normalize(self):
+        """
+        example ::
+
+        >>> a, b, c, d = Bool.create('abcd')
+        >>> (a & a).normalize()
+        a
+        >>> ((a|b) & a).normalize()
+        a
+        >>> ((a|b) & b) & c).normalize()
+        """
         if self._mark: return self
-        # a & a -> a
-        if self.fst == self.snd:
-            return self.fst.normalize()
-        # a & (a | c) -> a
-        if isinstance(self.snd, Or) and self.fst in self.snd:
-            return self.fst.normalize()
-        # (a | b) & a -> a
-        if isinstance(self.fst, Or) and self.snd in self.fst:
-            return self.snd.normalize()
+        children = self.children()
+        leng = len(children)
+        children = self.filter_children(children)
+        if leng!=len(children):
+            return reduce(operator.and_, children).normalize()
 
-        args0 = self.fst
-        args1 = self.snd
-        # (A | B) & C -> A & C | B & C
-        if isinstance(args0, Or):
-            left   = (args0.fst & args1).normalize()
-            right  = (args0.snd & args1).normalize()
-            return (left | right).normalize()
-        # A & (B | C) -> A & B | A & C
-        elif isinstance(args1, Or):
-            left   = (args0 & args1.fst).normalize()
-            right  = (args0 & args1.snd).normalize()
-            return (left | right).normalize()
-        # (A & B) & C -> A & (B & C)
-        if isinstance(args0, And):
-            left = args0.fst
-            right = (args0.snd & args1)
-            # try A & (B & C)
-            right2 = right.normalize()
-            if right != right2:
-                left2 = left.normalize()
-                return (left2 & right2).normalize()
-            # try (A & C) & B
-            left = args0.fst & args1
-            left2 = left.normalize()
-            if left != left2:
-                right2 = args0.snd
-                return (left2 & right2).normalize()
+        if isinstance(self.fst, Or):
+            # (A | B) & C -> A & C | B & C
+            return (self.fst.fst & self.snd | self.fst.snd & self.snd).normalize()
+        elif isinstance(self.snd, Or):
+            # A & (B | C) -> A & B | A & C
+            return (self.fst & self.snd.fst | self.fst & self.snd.snd).normalize()
 
-        # A & (B & C) -> (A & B) & C
-        if isinstance(args1, And):
-            left = (args0 & args1.fst).normalize()
-            right = args1.snd.normalize()
-            return (left & right).normalize()
+        flag = False
+        L = []
+        for c in children:
+            c2 = c.normalize()
+            if c!=c2: flag = True
+            L.append(c2)
 
-        left2 = args0.normalize()
-        right2 = args1.normalize()
-        if left2!=args0 or right2!=args1:
-            return (left2 & right2).normalize()
+        children = L
+        # if one element normalized, reconstruct all
+        if flag:
+            return reduce(operator.and_, children).normalize()
 
         self._mark = True
         return self
@@ -148,44 +173,23 @@ class Or(BinaryTerm):
     op = '|'
     def normalize(self):
         if self._mark: return self
-        # a | a -> a
-        if self.fst == self.snd:
-            return self.fst.normalize()
-        # a | (a & c) -> a
-        if isinstance(self.snd, And) and self.fst in self.snd:
-            return self.fst.normalize()
-        # (a & c) | a -> a
-        if isinstance(self.fst, And) and self.snd in self.fst:
-            return self.snd.normalize()
+        children = self.children()
+        leng = len(children)
+        children = self.filter_children(children)
+        if leng!=len(children):
+            return reduce(operator.or_, children).normalize()
 
-        args0 = self.fst
-        args1 = self.snd
-        # (A | B) | C
-        if isinstance(args0, Or):
-            left = args0.fst
-            right = (args0.snd | args1)
-            # try A | (B | C)
-            right2 = right.normalize()
-            if right != right2:
-                left2 = left.normalize()
-                return (left2 | right2).normalize()
-            # try (A | C) | B
-            left = args0.fst | args1
-            left2 = left.normalize()
-            if left != left2:
-                right2 = args0.snd
-                return (left2 | right2).normalize()
+        flag = False
+        L = []
+        for c in children:
+            c2 = c.normalize()
+            if c!=c2: flag = True
+            L.append(c2)
 
-        # A | (B | C) -> (A | B) | C
-        if isinstance(args1, Or):
-            left = (args0 | args1.fst).normalize()
-            right = args1.snd.normalize()
-            return (left  | right).normalize()
-
-        left2 = args0.normalize()
-        right2 = args1.normalize()
-        if left2!=args0 or right2!=args1:
-            return (left2 | right2).normalize()
+        children = L
+        # if one element normalized, reconstruct all
+        if flag:
+            return reduce(operator.or_, children).normalize()
 
         self._mark = True
         return self
