@@ -102,3 +102,14 @@ def test_step1_prime_implicants():
     print(primes)
     answer = {(c,1,0,0), (1,0,c,c), (1,c,c,0), (1,c,1,c)}
     assert answer == set(p.expr for p in primes)
+
+def test_step2_essential_prime_implicants():
+    a, b, c, d = qm.Bool.create('abcd')
+    obj = qm.QuineMcCluskey(a)
+    T = [(0,1,0,0), (1,0,0,0), (1,0,0,1), (1,0,1,0), (1,1,1,0), (1,0,1,1), (1,1,0,0), (1,1,1,1)]
+    primes = obj.step1_prime_implicants(T)
+    c = '_'
+    assert 4 == len(primes)
+    print(primes)
+    answer = {(c,1,0,0), (1,0,c,c), (1,c,c,0), (1,c,1,c)}
+    assert answer == set(p.expr for p in primes)

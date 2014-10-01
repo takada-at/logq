@@ -224,6 +224,132 @@ class Not(UnaryTerm):
         self._mark = True
         return self
 
+class QuineMcCluskey(object):
+    u"""
+    c.f. http://en.wikipedia.org/wiki/Quine%E2%80%93McCluskey_algorithm
+    """
+    def __init__(self, term):
+        self.term = term.normalize()
+        variables = list(term.variables)
+        variables.sort(lambda x,y: cmp(x.name, y.name))
+        self.variables = variables
+    def compute(self):
+        # 最小項標準形への変換
+        minterns = self.step0_minterms()
+        # 主項をえる
+        prime_implicants = self.step1_prime_implicants(bins)
+        # 必須項をえる
+        return self.step2_essential_prime_implicants(prime_implicants)
+    def step0_minterms(self):
+        """
+        最小項標準形への変換
+        """
+        def addvar(var, L):
+            res = []
+            for term in L:
+                if var not in term and ~var not in term:
+                    res += [term+[var], term+[~var]]
+                else:
+                    res.append(term)
+
+            return res
+
+        variables = self.variables
+        disjuncts = self.term.children()
+        newdisjuncts = []
+        for disjunct in disjuncts:
+            L = [disjunct.children()]
+            for var in variables:
+                L = addvar(var, L)
+
+            newdisjuncts += L
+
+        return self._normalize_terms(newdisjuncts)
+    def step1_prime_implicants(self, terms):
+        """
+        主項を見つける
+        """
+        trees = [MergeTree({idx}, term) for idx, term in enumerate(terms)]
+        merged, _ = self._merge(trees)
+        primes = []
+        while merged:
+            merged, marked = self._merge(merged)
+            primes += marked
+
+        return primes
+    def step2_essential_prime_implicants(self, implicants):
+        """
+        必須項を見つける
+
+        http://en.wikipedia.org/wiki/Petrick%27s_method
+        """
+        table = dict()
+        names = dict()
+        name2t= dict()
+        c = 0
+        for term in implicants:
+            # naming terms
+            name = "p{}".format(c)
+            names[id(term)] = name
+            name2t[name] = term
+            c+=1
+            for id_ in term.ids:
+                table.setdefault(id_, set())
+                table[id_].add(term)
+
+        essentials = []
+        variables = self.variables
+        functions = []
+        for id_, terms in table.items():
+            if len(terms)==1:
+                essentials += terms
+                continue
+            else:
+                forms = [Atomic(names[id(term)]) for term in terms]
+                boolean = reduce(operator.or_, forms)
+                # ex. p0 | p1
+                functions.append(boolean)
+
+        # ex. (p0 | p1) & (p2 | p3)
+        sums = reduce(operator.and_, functions)
+        sums = sums.normalize()
+        ranks = []
+        for disjunct in sums.children():
+            # sort by (1. num of prime implicants, 2. num of atomics of each prime implicants)
+            rank = sum(len(name2t[t.name]) for t in disjunct.children())
+            ranks.append(len(disjunct.children()), rank, disjunct)
+
+        ranks.sort(key=lambda x: (x[0],x[1]))
+        essentials += [name2t[t.name] for t in ranks[0][2].children()]
+        return essentials
+
+    def _normalize_terms(self, terms):
+        variables = self.variables
+        cache = set()
+        res   = []
+        for disjunct in terms:
+            # convert to 1/0
+            disjunct = tuple(1 if v in disjunct else 0 for v in variables)
+            # delete non unique terms
+            if disjunct in cache:
+                continue
+            cache.add(disjunct)
+            res.append(disjunct)
+
+        return res
+    def _merge(self, terms):
+        mergedterms = set()
+        pairl = []
+        for i, j, term0, term1 in pairs(terms):
+            merged = term0.try_merge(term1)
+            if merged:
+                mergedterms.add(i)
+                mergedterms.add(j)
+                pairl.append(merged)
+
+        marked = [term for i, term in enumerate(terms) if i not in mergedterms]
+        return (pairl, marked)
+
 class MergeTree(object):
     CHAR = '_'
     def __init__(self, ids, expr):
@@ -261,118 +387,3 @@ class MergeTree(object):
 
         return (distance, merged)
 
-class QuineMcCluskey(object):
-    def __init__(self, term):
-        self.term = term.normalize()
-        variables = list(term.variables)
-        variables.sort(lambda x,y: cmp(x.name, y.name))
-        self.variables = variables
-    def compulte(self):
-        # 最小項標準形への変換
-        minterns = self.step0_minterms()
-        prime_implicants = self.step1_prime_implicants(bins)
-    def step0_minterms(self):
-        """
-        最小項標準形への変換
-        """
-        variables = self.variables
-        disjuncts = self.term.children()
-        newdisjuncts = []
-        for disjunct in disjuncts:
-            L = [disjunct.children()]
-            for var in variables:
-                L2 = []
-                for term in L:
-                    # A & B -> A & B & C | A & B & ~C
-                    if var not in term and ~var not in term:
-                        L2.append(term + [var])
-                        L2.append(term + [~var])
-                    else:
-                        L2.append(term)
-
-                L = L2
-
-            newdisjuncts += L
-
-        return self._normalize_terms(newdisjuncts)
-    def step1_prime_implicants(self, terms):
-        """
-        主項を見つける
-        """
-        trees = [MergeTree({idx}, term) for idx, term in enumerate(terms)]
-        merged, _ = self._merge(trees)
-        primes = []
-        while merged:
-            merged, marked = self._merge(merged)
-            primes += marked
-
-        return primes
-    def step2_essential_prime_implicants(self, implicants):
-        """
-        必須項を見つける
-        """
-        table = dict()
-        names = dict()
-        name2t= dict()
-        c = 0
-        for term in implicants:
-            # naming terms
-            name = "p{}".format(c)
-            names[id(term)] = name
-            name2t[name] = term
-            c+=1
-            for id_ in term.ids:
-                table.setdefault(id_, set())
-                table[id_].add(term)
-
-        essentials = []
-        variables = self.variables
-        functions = []
-        for id_, terms in table.items():
-            if len(terms)==1:
-                essentials += terms
-                continue
-            else:
-                forms = [Atomic(names[id(term)]) for term in terms]
-                boolean = reduce(operator.or_, forms)
-                # ex. p0 | p1
-                functions.append(boolean)
-
-        # ex. (p0 | p1) & (p2 | p3)
-        sums = reduce(operator.and_, functions)
-        sums = sums.normalize()
-        ranks = []
-        for disjunct in sums.children():
-            rank = sum(len(name2t[t.name]) for t in disjunct.children())
-            ranks.append(len(disjunct.children()), rank, disjunct)
-
-        ranks.sort()
-        essentials += [name2t[t.name] for t in ranks[0].children()]
-        return essentials
-
-    def _normalize_terms(self, terms):
-        variables = self.variables
-        cache = set()
-        res   = []
-        for disjunct in terms:
-            # sort order
-            disjunct = tuple(1 if v in disjunct else 0 for v in variables)
-            # delete non unique terms
-            if disjunct in cache:
-                continue
-            cache.add(disjunct)
-            res.append(disjunct)
-
-        return res
-    def _merge(self, terms):
-        mergedterms = set()
-        pairl = []
-        for i, j, term0, term1 in pairs(terms):
-            merged = term0.try_merge(term1)
-            if merged:
-                mergedterms.add(i)
-                mergedterms.add(j)
-                pairl.append(merged)
-
-        marked = [term for i, term in enumerate(terms) if i not in mergedterms]
-        return (pairl, marked)
