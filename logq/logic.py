@@ -1,12 +1,12 @@
 # -*- coding: utf-8 -*-
 from __future__ import absolute_import, division, print_function, unicode_literals
-import operator
+"""
+Quine–McCluskey algorithm
+===========================
+"""
 
-def pairs(L):
-    leng = len(L)
-    for idx0 in range(leng-1):
-        for idx1 in range(idx0+1, leng):
-            yield idx0, idx1, L[idx0], L[idx1]
+from itertools import combinations
+import operator
 
 class Bool(object):
     @classmethod
@@ -120,7 +120,7 @@ class BinaryTerm(Bool):
         marks = set()
         if isinstance(self, And): dual = Or
         elif isinstance(self, Or): dual = And
-        for idx0, idx1, x, y in pairs(children):
+        for (idx0, x), (idx1, y) in combinations(enumerate(children), 2):
             # A & A -> A
             # A | A -> A
             if x == y: marks.add(idx1)
@@ -276,12 +276,13 @@ class QuineMcCluskey(object):
         """
         必須項を見つける
 
+        Petrick's method の実装
+
         http://en.wikipedia.org/wiki/Petrick%27s_method
         """
         table = dict()
         names = dict()
         name2t= dict()
-        excludes = set()
         c = 0
         for term in implicants:
             # naming terms
@@ -337,7 +338,7 @@ class QuineMcCluskey(object):
     def _merge(self, terms):
         mergedterms = set()
         pairl = []
-        for i, j, term0, term1 in pairs(terms):
+        for (i, term0), (j, term1) in combinations(enumerate(terms), 2):
             merged = term0.try_merge(term1)
             if merged:
                 mergedterms.add(i)

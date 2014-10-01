@@ -89,6 +89,33 @@ def test_normalize():
     expect = (b&c | c&d | a&b&d)
     assert {frozenset(child.children()) for child in expect.children()} == {frozenset(child.children()) for child in r2.children()} 
 
+def test_normalize_random():
+    from operator import and_, or_, invert
+    import random
+    num = random.randint(10, 30)
+    atomics = qm.Bool.create('abcde')
+    ops = [and_, or_, invert]
+    # construct random form
+    term = random.choice(atomics)
+    for i in range(num):
+        op = random.choice(ops)
+        if op is invert:
+            term = op(term)
+        else:
+            term = op(term, random.choice(atomics))
+
+    nterm = term.normalize()
+    print(term)
+    print('-->', nterm)
+    childs = nterm.children()
+    # assert unique
+    names = [k.name for k in childs]
+    assert len(set(names))==len(names)
+    for c in childs:
+        assert not isinstance(c, qm.Or)
+        names = [k.name for k in c.children()]
+        assert len(set(names))==len(names)
+
 def test_step0_minterms():
     a, b, c, d = qm.Bool.create('abcd')
     term = a & b | b & c
