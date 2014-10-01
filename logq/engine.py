@@ -119,4 +119,23 @@ def _create_dfa(factory, map_, nfa, newstart):
 
     return dfa
 
+class Operand():
+    pass
 
+class StringEq(Operand):
+    def __init__(self, colname, queryword, statefactory):
+        self.colname = colname
+        self.queryword = queryword
+        self.statefactory = statefactory
+    def create(self):
+        factory = self.statefactory
+        automaton = NFA():
+        automaton.start = factory.new_state()
+        prev = automaton.start
+        for c in self.queryword:
+            nstate = factory.new_state()
+            automaton.link(prev, c, nstate)
+            prev = nstate
+
+        automaton.accepts.add(prev)
+        return automaton
