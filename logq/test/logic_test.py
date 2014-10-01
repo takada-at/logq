@@ -79,6 +79,16 @@ def test_normalize():
     r2 = r.normalize()
     assert r2 == a & b & c
 
+    r = (c | b) & (c | b | d) & (c | d) & (b | d) & (c | a)
+    # -> (c | bd) (c | a(b|d)) (b|d)
+    # -> (c | bd) (c | ab | ad) (b|d)
+    # -> (c | bd(ab|ad)) (b|d)
+    # -> (c | abd) (b | d)
+    # -> bc | cd | abd 
+    r2 = r.normalize()
+    expect = (b&c | c&d | a&b&d)
+    assert {frozenset(child.children()) for child in expect.children()} == {frozenset(child.children()) for child in r2.children()} 
+
 def test_step0_minterms():
     a, b, c, d = qm.Bool.create('abcd')
     term = a & b | b & c
@@ -97,7 +107,7 @@ def test_step1_prime_implicants():
     obj = qm.QuineMcCluskey(a)
     T = [(0,1,0,0), (1,0,0,0), (1,0,0,1), (1,0,1,0), (1,1,1,0), (1,0,1,1), (1,1,0,0), (1,1,1,1)]
     primes = obj.step1_prime_implicants(T)
-    c = '_'
+    c = qm.MergeTree.CHAR
     assert 4 == len(primes)
     print(primes)
     answer = {(c,1,0,0), (1,0,c,c), (1,c,c,0), (1,c,1,c)}
@@ -105,11 +115,12 @@ def test_step1_prime_implicants():
 
 def test_step2_essential_prime_implicants():
     a, b, c, d = qm.Bool.create('abcd')
-    obj = qm.QuineMcCluskey(a)
+    obj = qm.QuineMcCluskey(a&b&c&d)
     T = [(0,1,0,0), (1,0,0,0), (1,0,0,1), (1,0,1,0), (1,1,1,0), (1,0,1,1), (1,1,0,0), (1,1,1,1)]
     primes = obj.step1_prime_implicants(T)
-    c = '_'
-    assert 4 == len(primes)
     print(primes)
-    answer = {(c,1,0,0), (1,0,c,c), (1,c,c,0), (1,c,1,c)}
-    assert answer == set(p.expr for p in primes)
+    essentials = obj.step2_essential_prime_implicants(primes)
+    print(essentials)
+    assert essentials
+    assert {b&~c&~d, a&~b, a&c} == set(essentials)
+

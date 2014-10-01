@@ -50,6 +50,8 @@ class Bool(object):
         return self==other
     def __hash__(self):
         return ~hash(self.name)
+    def children(self):
+        return [self]
     def format(self, term):
         if term.atomic or isinstance(term, UnaryTerm):
             return str(term)
@@ -158,17 +160,10 @@ class And(BinaryTerm):
             # A & (B | C) -> A & B | A & C
             return (self.fst & self.snd.fst | self.fst & self.snd.snd).normalize()
 
-        flag = False
-        L = []
-        for c in children:
-            c2 = c.normalize()
-            if c!=c2: flag = True
-            L.append(c2)
-
-        children = L
-        # if one element normalized, reconstruct all
-        if flag:
-            return reduce(operator.and_, children).normalize()
+        fst2 = self.fst.normalize()
+        snd2 = self.snd.normalize()
+        if fst2!=self.fst or snd2!=self.snd:
+            return (fst2 & snd2).normalize()
 
         self._mark = True
         return self
@@ -286,6 +281,7 @@ class QuineMcCluskey(object):
         table = dict()
         names = dict()
         name2t= dict()
+        excludes = set()
         c = 0
         for term in implicants:
             # naming terms
@@ -297,15 +293,16 @@ class QuineMcCluskey(object):
                 table.setdefault(id_, set())
                 table[id_].add(term)
 
-        essentials = []
+        essentials = set()
         variables = self.variables
         functions = []
         for id_, terms in table.items():
             if len(terms)==1:
-                essentials += terms
+                term = list(terms)[0]
+                essentials.add(term)
                 continue
             else:
-                forms = [Atomic(names[id(term)]) for term in terms]
+                forms = [Atomic(names[id(term)]) for term in terms if term not in essentials]
                 boolean = reduce(operator.or_, forms)
                 # ex. p0 | p1
                 functions.append(boolean)
@@ -317,11 +314,11 @@ class QuineMcCluskey(object):
         for disjunct in sums.children():
             # sort by (1. num of prime implicants, 2. num of atomics of each prime implicants)
             rank = sum(len(name2t[t.name]) for t in disjunct.children())
-            ranks.append(len(disjunct.children()), rank, disjunct)
+            ranks.append((len(disjunct.children()), rank, disjunct))
 
         ranks.sort(key=lambda x: (x[0],x[1]))
-        essentials += [name2t[t.name] for t in ranks[0][2].children()]
-        return essentials
+        essentials |= {name2t[t.name] for t in ranks[0][2].children()}
+        return [term.boolean(self.variables) for term in essentials]
 
     def _normalize_terms(self, terms):
         variables = self.variables
@@ -361,8 +358,8 @@ class MergeTree(object):
     def boolean(self, variables):
         res = []
         for i, var in enumerate(variables):
-            if self.expr[i]==0: res.add(~var)
-            elif self.expr[i]==1: res.add(var)
+            if self.expr[i]==0: res.append(~var)
+            elif self.expr[i]==1: res.append(var)
 
         return reduce(operator.and_, res)
     def try_merge(self, other):
