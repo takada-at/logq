@@ -149,5 +149,11 @@ def test_step2_essential_prime_implicants():
     essentials = obj.step2_essential_prime_implicants(primes)
     print(essentials)
     assert essentials
-    assert {b&~c&~d, a&~b, a&c} == set(essentials)
+    assert {b&~c&~d, a&~b, a&c} == set(essentials.children())
 
+def test_compute():
+    a, b, c, d = qm.Bool.create('abcd')
+    z = ~a & ~b & c & d | b & c & d | a & b & ~c | a & ~b & c & d
+    obj = qm.QuineMcCluskey(z)
+    z2 = obj.compute()
+    assert z2 == c & d | a & b & ~c 

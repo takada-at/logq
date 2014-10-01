@@ -11,7 +11,7 @@ import operator
 class Bool(object):
     @classmethod
     def create(cls, ite):
-        u"""
+        """
         >>> a, b, c = Bool.create('abc')
         >>> a | b
         a | b
@@ -33,6 +33,14 @@ class Bool(object):
             return reduce(lambda x,y: x | y.variables, self.args, set())
 
     def normalize(self):
+        """
+        原子式または否定の1つ以上論理積の論理和になるまで展開する
+
+        ex.
+        >>> a, b, c = Bool.create('abc')
+        >>> ~(a & b).normalize()
+        ~a | ~b
+        """
         return self
     def __repr__(self):
         return self.name
@@ -117,6 +125,9 @@ class BinaryTerm(Bool):
     def __ne__(self, other):
         return not(self==other)
     def filter_children(self, children):
+        """
+        引数の内で消せるものを消す
+        """
         marks = set()
         if isinstance(self, And): dual = Or
         elif isinstance(self, Or): dual = And
@@ -136,7 +147,7 @@ class And(BinaryTerm):
     op = '&'
     def normalize(self):
         """
-        example ::
+        Example ::
 
         >>> a, b, c, d = Bool.create('abcd')
         >>> (a & a).normalize()
@@ -221,6 +232,8 @@ class Not(UnaryTerm):
 
 class QuineMcCluskey(object):
     u"""
+    クワイン・マクラスキー法の実装
+
     c.f. http://en.wikipedia.org/wiki/Quine%E2%80%93McCluskey_algorithm
     """
     def __init__(self, term):
@@ -230,9 +243,9 @@ class QuineMcCluskey(object):
         self.variables = variables
     def compute(self):
         # 最小項標準形への変換
-        minterns = self.step0_minterms()
+        minterms = self.step0_minterms()
         # 主項をえる
-        prime_implicants = self.step1_prime_implicants(bins)
+        prime_implicants = self.step1_prime_implicants(minterms)
         # 必須項をえる
         return self.step2_essential_prime_implicants(prime_implicants)
     def step0_minterms(self):
@@ -260,11 +273,13 @@ class QuineMcCluskey(object):
             newdisjuncts += L
 
         return self._normalize_terms(newdisjuncts)
-    def step1_prime_implicants(self, terms):
+    def step1_prime_implicants(self, minterms):
         """
         主項を見つける
+
+        それ以上マージできなくなるまで最小項をマージしつづける
         """
-        trees = [MergeTree({idx}, term) for idx, term in enumerate(terms)]
+        trees = [MergeTree({idx}, term) for idx, term in enumerate(minterms)]
         merged, _ = self._merge(trees)
         primes = []
         while merged:
@@ -276,57 +291,37 @@ class QuineMcCluskey(object):
         """
         必須項を見つける
 
-        Petrick's method の実装
+        すべての最小項をカバーする主項の組み合わせの内、最も簡単なものを探す
+
+        Petrick's method:
 
         http://en.wikipedia.org/wiki/Petrick%27s_method
         """
-        table = dict()
-        names = dict()
-        name2t= dict()
-        c = 0
-        for term in implicants:
-            # naming terms
-            name = "p{}".format(c)
-            names[id(term)] = name
-            name2t[name] = term
-            c+=1
-            for id_ in term.ids:
-                table.setdefault(id_, set())
-                table[id_].add(term)
-
+        table = self._create_implicant_chart(implicants)
+        minterms = set(table.keys())
         essentials = set()
-        variables = self.variables
-        functions = []
+        ids = set()
         for id_, terms in table.items():
             if len(terms)==1:
                 term = list(terms)[0]
+                ids |= term.ids
                 essentials.add(term)
-                continue
-            else:
-                forms = [Atomic(names[id(term)]) for term in terms if term not in essentials]
-                boolean = reduce(operator.or_, forms)
-                # ex. p0 | p1
-                functions.append(boolean)
 
-        # ex. (p0 | p1) & (p2 | p3)
-        sums = reduce(operator.and_, functions)
-        sums = sums.normalize()
-        ranks = []
-        for disjunct in sums.children():
-            # sort by (1. num of prime implicants, 2. num of atomics of each prime implicants)
-            rank = sum(len(name2t[t.name]) for t in disjunct.children())
-            ranks.append((len(disjunct.children()), rank, disjunct))
+        # すべての最小項がカバーできた
+        if len(ids)==len(minterms):
+            return self._restore_logical_term(essentials)
 
-        ranks.sort(key=lambda x: (x[0],x[1]))
-        essentials |= {name2t[t.name] for t in ranks[0][2].children()}
-        return [term.boolean(self.variables) for term in essentials]
+        # 見つかった必須項を表から削除し、Patrics's methodを適用する
+        for id_ in ids: del(table[id_])
+        implicants = set(implicants) - essentials
+        self._patrics_method(essentials, table, implicants)
 
     def _normalize_terms(self, terms):
         variables = self.variables
         cache = set()
         res   = []
         for disjunct in terms:
-            # convert to 1/0
+            # convert to 0 cube
             disjunct = tuple(1 if v in disjunct else 0 for v in variables)
             # delete non unique terms
             if disjunct in cache:
@@ -341,12 +336,51 @@ class QuineMcCluskey(object):
         for (i, term0), (j, term1) in combinations(enumerate(terms), 2):
             merged = term0.try_merge(term1)
             if merged:
-                mergedterms.add(i)
-                mergedterms.add(j)
+                mergedterms.add(i); mergedterms.add(j)
                 pairl.append(merged)
 
         marked = [term for i, term in enumerate(terms) if i not in mergedterms]
         return (pairl, marked)
+    def _create_implicant_chart(self, implicants):
+        table = dict()
+        for term in implicants:
+            for id_ in term.ids:
+                table.setdefault(id_, set())
+                table[id_].add(term)
+        return table
+    def _restore_logical_term(self, terms):
+        L = [term.boolean(self.variables) for term in terms]
+        return reduce(operator.or_, L)
+    def _patrics_method(self, essentials, table, implicants):
+        names = dict()
+        name2t= dict()
+        c = 0
+        for term in implicants:
+            # naming terms
+            name = "p{}".format(c); c+=1
+            names[term] = name
+            name2t[name] = term
+
+        functions = []
+        for id_, terms in table.items():
+            forms = [Atomic(names[term]) for term in terms]
+            boolean = reduce(operator.or_, forms)
+            # ex. p0 | p1
+            functions.append(boolean)
+
+        # ex. (p0 | p1) & (p2 | p3)
+        sums = reduce(operator.and_, functions)
+        sums = sums.normalize()
+        ranks = []
+        for disjunct in sums.children():
+            # 主項の数, 主項の中の原子式の数でソート
+            # sort by (1. num of prime implicants, 2. num of atomics of each prime implicants)
+            rank = sum(len(name2t[t.name]) for t in disjunct.children())
+            ranks.append((len(disjunct.children()), rank, disjunct))
+
+        ranks.sort(key=lambda x: (x[0],x[1]))
+        essentials |= {name2t[t.name] for t in ranks[0][2].children()}
+        return self._restore_logical_term(essentials)
 
 class MergeTree(object):
     CHAR = '_'
