@@ -1,189 +1,193 @@
 # -*- coding: utf-8 -*-
 from __future__ import division, print_function, absolute_import
+from collections import Counter, defaultdict
 from itertools import combinations
-from .logic import And, Or, Not, Atomic
-class StateFactory(object):
-    def __init__(self, init=0):
-        self.state = init
-    def new_state(self):
-        res = self.state
-        self.state += 1
-        return res
+from .logic import Atomic, Bool, And, Or, Not
 
-class FA(object):
+class CsvParser(object):
+    """
+    サンプル実装のパーサー
+    """
+    def __init__(self, fileobj, engine):
+        self.fileobj = fileobj
+        self.engine  = engine
+    def read(self):
+        self.newline()
+        string = self.fileobj.read()
+        for c in string:
+            self.state = self.readc(c, self.state)
+            if self.state==15:
+                yield self.vals
+
+            self.newline()
+    def newline(self):
+        self.col = 0
+        self.state = 0
+        self.buffer = ''
+        self.engine.newline()
+        self.vals = []
+    def readc(self, c, state):
+        if c=='"':
+            if state==0:
+                return 1
+            elif state==1:
+                return 0
+        elif c==',':
+            if state==1: self.buffer+=c; return 1
+            val = self.buffer
+            self.buffer = ''
+            self.vals.append(val)
+            self.col += 1
+            if state!=4 and state!=5:
+                res = engine.match(self.col, self.buffer)
+                if res == Engine.FAIL: return 5
+                elif res == Engine.SUCCESS: return 4
+        elif c=='\n':
+            if state==1: self.buffer+=c; return 1
+            else:
+                val = self.buffer
+                if state!=4 and state!=5:
+                    res = engine.match(self.col, self.buffer)
+                    if res == Engine.FAIL: state=5
+                    elif res == Engine.SUCCESS: state=4
+
+                return state + 10
+        else:
+            self.buffer += c
+            return state
+
+class Engine(object):
+    NORMAL = 0
+    ACCEPT = 1
+    FAIL = 2
+    @classmethod
+    def construct(cls, expr):
+        expr.normalize()
+        opcodes = expr._construct()
+        return cls(opcodes)
+
+    def __init__(self, opcodes):
+        self.opcodes = opcodes
+    def newline(self):
+        self._flag = dict():
+        for i, row in enumerate(self.opcodes.table):
+            self._flag[i] = {k: 0 for k in row.keys()}
+    def match(self, colname, val):
+        res = self._flag
+        for i, row in enumerate(self.opcodes.table):
+            opcodes = row[colname]
+            if all(self.execute_op(op, arg, val) for op, arg in opcodes):
+                del(res[i][colname])
+                if not res[i]: return self.ACCEPT
+            else:
+                del(res[i][colname])
+                if not res[i]:
+                    del(res[i])
+                    if not res: return self.FAIL
+
+        return self.NORMAL
+    def execute_op(self, op, arg, val):
+        if op=="=":
+            return arg==val
+
+class OpCodes(object):
     def __init__(self):
-        self.map_ = {}
-        self.start = None
-        self.accepts = set()
-    def __or__(self, other):
-        new = self.__class__()
-        new.map_ = deepcopy(self.map_)
-        for k, v in other.map_.items():
-            new.map_[k] = v.copy()
+        self.table = [dict()]
+    def add_codes(self, colname, ops):
+        d = self.current
+        d.setdefault(colname, [])
+        d[colname].append(ops)
+    def new_row(self):
+        self.table.append({})
+    def add_row(self, row):
+        self.table.append(row)
+    def merge_row(self, row):
+        for colname, opcodes in row.items():
+            for ops in opcodes:
+                self.add_codes(colname, ops)
+    @property
+    def current(self):
+        return self.table[-1]
 
-        return new
-    def is_accept_state(self, state):
-        return state in self.accepts
-    def get_links(self, state, input_=None, exclusive=''):
-        links = [(i, ns) for (s, i), ns self.map_.items() if s==state]
-        if input_ is not None:
-            links = {link for link in links if link[0]==input_}
-        if exclusive is not None:
-            links = {link for link in links if link[0]!=exclusive}
-        return links
-    def link(self, state, input_, nextstate):
-        self._add_map(state, input_, nextstate)
+    @current.setter
+    def current(self, row):
+        self.table[-1] = row
 
-class NFA(FA):
-    def _add_map(self, state, input_, nextstate):
-        args = (state, input_)
-        self.map_.setdefault(args, set())
-        self.map_[args].add(nextstate)
-
-class DFA(FA):
-    def to_table(self):
-        states = list(self._states)
-        inputs = list(self._inputs)
-        states.sort()
-        inputs.sort()
-        table = [[''] + inputs]
-        table += [[state] + [self.map_.get((state, i)) for i in inputs] for state in states]
-        return table
-
-    def _add_map(self, state, input_, nextstate):
-        args = (state, input_)
-        self.map_[args] = nextstate
-
-def convert_nfa2dfa(nfa, factory):
-    newstart, newmap = _convertlink(nfa)
-    return _create_dfa(factory, newmap, nfa, newstart)
-
-def _convertlink(nfa):
-    def extends(nfa, states):
-        res = set(states)
-        for state in states:
-            links = nfa.get_links(state, input_='', exclusive=None)
-            res.update({link[1] for link in links})
-
-        return frozenset(res)
-
-    newstart = extends(nfa, set([nfa.start]))
-    stack = [newstart]
-    statecache = set()
-    newmap = dict()
-    while stack:
-        curstates = stack.pop()
-        newstates = dict()
-        for nfastate in curstates:
-            links = nfa.get_links(nfastate, input_=None, exclusive='')
-            for input_, state in links:
-                newstates.setdefault(input_, set())
-                newstates[input_].add(state)
-
-        statecache.add(frozenset(curstates))
-        for input_, states in newstates.items():
-            extended = extends(nfa, states)
-            newlink = (curstates, input_)
-            newmap[newlink] =  extended
-            if extended not in statecache:
-                stack.append(extended)
-    return newstart, newmap
-
-def _create_dfa(factory, map_, nfa, newstart):
-    def createnumstate(statecache, factory, state):
-        if state not in statecache:
-            numstate = factory.new_state()
-            statecache[state] = numstate
-
-        return statecache[state]
-
-    def isfinal(state, nfa):
-        return any(nfa.is_accept_state(stat) for stat in state)
-
-    dfa = DFA()
-    statecache = dict()
-    newmap = dict()
-    dfa.start = createnumstate(statecache, factory, newstart)
-    for (state0, input_), state1 in map_.items():
-        numstate0 = createnumstate(statecache, factory, state0)
-        if isfinal(state0, nfa):
-            dfa.accepts.add(numstate0)
-
-        numstate1 = createnumstate(statecache, factory, state1)
-        dfa.link(numstate0, input_, numstate1)
-        if isfinal(state1, nfa):
-            dfa.accepts.add(numstate1)
-
-    return dfa
-
-class Engine(NFA):
-    def __init__(self):
-        super(Engine, self).__init__()
-        self.colnames = []
-
-class Expr(Atomic):
-    def __invert__(self):
-        return qNot(self)
+class BaseBool(Bool):
     def __and__(self, other):
         return qAnd(self, other)
     def __or__(self, other):
         return qOr(self, other)
+    def __invert__(self):
+        return qNot(self)
+    def compile(self):
+        engine = Engine.construct(self)
+        return engine
+
+class Expr(BaseBool, Atomic):
+    def _construct(self):
+        eng = OpCodes()
+        eng.add_codes(self.colname, self.ops)
+        return eng
+
+class Column(object):
+    def __init__(self, name):
+        self.colname = name
+    def __eq__(self, other):
+        return StringEq(self.colname, other)
 
 class StringEq(Expr):
     def __init__(self, colname, queryword):
+        self.name = "col_{} = '{}'".format(colname, queryword)
         self.colname = colname
-        self.queryword = queryword
-        self.colnames = [colname]
-    def __or__(self, other):
-        new = super(StringEq, self).__or__(other)
-        new.colname += other
-        return new
-    def construct(self, factory):
-        automaton = Engine():
-        automaton.start = factory.new_state()
-        prev = automaton.start
-        for c in self.queryword:
-            nstate = factory.new_state()
-            automaton.link(prev, c, nstate)
-            prev = nstate
+        self.ops = ('=', queryword)
+        self.args = set([self])
 
-        automaton.accepts.add(prev)
-        return automaton
-
-class qNot(Not):
+class qNot(BaseBool, Not):
     @property
     def colname(self):
-        return list(self.variables)[0].colname
+        return self.child.colname
+    def invert(self, op):
+        if op=='=':
+            return '!='
+        elif op=='>':
+            return '<='
+        elif op=='<':
+            return '>='
+        elif op=='<=':
+            return '>'
+        elif op=='>=':
+            return '<'
+    def _construct(self):
+        child = self.child
+        eng0 = OpCodes()
+        eng1 = child._construct(factory)
+        for colname, opcodes in eng1.current():
+            for ops in opcodes:
+                nops = (self.invert(ops[0]), ops[1])
+                eng0.add_codes(colname, nops)
 
-class qAnd(And):
-    def construct(self, factory):
-        automaton = Engine():
-        automaton.start = factory.new_state()
-        prev = {automaton.start}
-        children = self.children
-        children.sort(key=lambda x: x.colname)
-        for ch in children:
-            nfa = ch.construct(factory)
-            automaton |= nfa
-            for st in prev:
-                automaton.link(st, '', nfa.start)
+        return eng0
 
-            prev = automaton.accepts
-
-        automaton.accepts = set(automaton.accepts)
-        return automaton
-
-class qOr(Or):
-    def construct(self, factory):
-        automaton = Engine():
-        automaton.start = factory.new_state()
-        prev = {automaton.start}
-        children = self.children
+class qAnd(BaseBool, And):
+    def _construct(self):
+        children = self.children()
+        children.sort(key=lambda x: list(x.variables)[0].colname)
+        eng = OpCodes()
         for child in children:
-            nfa = children.construct(factory)
-            automaton |= nfa
-            automaton.link(automaton.prev, '', nfa.start)
-            automaton.accepts |= nfa.accepts
+            e0 = child._construct()
+            eng.merge_row(e0.current)
 
-        for nfa0, nfa1 in combinations(nfas):
+        return eng
+
+class qOr(BaseBool, Or):
+    def _construct(self):
+        children = self.children()
+        eng = OpCodes()
+        for child in children:
+            e0 = child._construct()
+            eng.merge_row(e0.current)
+            eng.new_row()
+
+        return eng
 
