@@ -104,7 +104,9 @@ class EngineFactory():
                       fail_table, exprs)
 
     def _construct_poslist(self, table, cols, poslist):
-        for rowstate in range(1, 2**len(table)):
+        rowstates = range(1, 2**len(table))
+        rowstates.reverse()
+        for rowstate in rowstates:
             for col in cols:
                 flag = False
                 for rowid, row in enumerate(table):

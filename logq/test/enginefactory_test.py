@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 from __future__ import division, print_function, absolute_import
 from .. import enginefactory as ef
-from .. import engine as e
+from .. import expr as e
 
 def test_EngineFactory():
     fac = ef.EngineFactory()
