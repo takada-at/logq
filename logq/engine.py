@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 from __future__ import division, print_function, absolute_import
-
+from itertools import combinations
+from .logic import And, Or, Not, Atomic
 class StateFactory(object):
     def __init__(self, init=0):
         self.state = init
@@ -14,27 +15,23 @@ class FA(object):
         self.map_ = {}
         self.start = None
         self.accepts = set()
-        self._links = {}
-        self._states = set()
-        self._inputs = set()
-    def __repr__(self):
-        return str(self._states)
+    def __or__(self, other):
+        new = self.__class__()
+        new.map_ = deepcopy(self.map_)
+        for k, v in other.map_.items():
+            new.map_[k] = v.copy()
+
+        return new
     def is_accept_state(self, state):
         return state in self.accepts
     def get_links(self, state, input_=None, exclusive=''):
-        links = self._links.get(state, set())
+        links = [(i, ns) for (s, i), ns self.map_.items() if s==state]
         if input_ is not None:
             links = {link for link in links if link[0]==input_}
         if exclusive is not None:
             links = {link for link in links if link[0]!=exclusive}
         return links
     def link(self, state, input_, nextstate):
-        self._inputs.add(input_)
-        self._states.add(state)
-        self._states.add(nextstate)
-        link = (input_, nextstate)
-        self._links.setdefault(state, set())
-        self._links[state].add(link)
         self._add_map(state, input_, nextstate)
 
 class NFA(FA):
@@ -119,17 +116,30 @@ def _create_dfa(factory, map_, nfa, newstart):
 
     return dfa
 
-class Operand():
-    pass
+class Engine(NFA):
+    def __init__(self):
+        super(Engine, self).__init__()
+        self.colnames = []
 
-class StringEq(Operand):
-    def __init__(self, colname, queryword, statefactory):
+class Expr(Atomic):
+    def __invert__(self):
+        return qNot(self)
+    def __and__(self, other):
+        return qAnd(self, other)
+    def __or__(self, other):
+        return qOr(self, other)
+
+class StringEq(Expr):
+    def __init__(self, colname, queryword):
         self.colname = colname
         self.queryword = queryword
-        self.statefactory = statefactory
-    def create(self):
-        factory = self.statefactory
-        automaton = NFA():
+        self.colnames = [colname]
+    def __or__(self, other):
+        new = super(StringEq, self).__or__(other)
+        new.colname += other
+        return new
+    def construct(self, factory):
+        automaton = Engine():
         automaton.start = factory.new_state()
         prev = automaton.start
         for c in self.queryword:
@@ -139,3 +149,41 @@ class StringEq(Operand):
 
         automaton.accepts.add(prev)
         return automaton
+
+class qNot(Not):
+    @property
+    def colname(self):
+        return list(self.variables)[0].colname
+
+class qAnd(And):
+    def construct(self, factory):
+        automaton = Engine():
+        automaton.start = factory.new_state()
+        prev = {automaton.start}
+        children = self.children
+        children.sort(key=lambda x: x.colname)
+        for ch in children:
+            nfa = ch.construct(factory)
+            automaton |= nfa
+            for st in prev:
+                automaton.link(st, '', nfa.start)
+
+            prev = automaton.accepts
+
+        automaton.accepts = set(automaton.accepts)
+        return automaton
+
+class qOr(Or):
+    def construct(self, factory):
+        automaton = Engine():
+        automaton.start = factory.new_state()
+        prev = {automaton.start}
+        children = self.children
+        for child in children:
+            nfa = children.construct(factory)
+            automaton |= nfa
+            automaton.link(automaton.prev, '', nfa.start)
+            automaton.accepts |= nfa.accepts
+
+        for nfa0, nfa1 in combinations(nfas):
+
