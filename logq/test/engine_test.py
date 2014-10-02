@@ -32,7 +32,8 @@ def test_NFA():
 
     assert {('', 1), ('',6)} == nfa.get_links(nfa.start, '', exclusive=None)
     fac = engine.StateFactory()
-    dfa = engine.convert_nfa2dfa(nfa, fac)
+    cvt = engine.Converter()
+    dfa = cvt.dfa(nfa, fac)
     assert dfa
     table = dfa.to_table()
     print(table)

@@ -1,40 +1,45 @@
 # -*- coding: utf-8 -*-
 from __future__ import division, print_function, absolute_import
+from collections import Counter, defaultdict
+from itertools import combinations
+from .logic import Atomic, Bool, And, Or, Not
 
 class StateFactory(object):
-    def __init__(self, init=0):
-        self.state = init
-    def new_state(self):
-        res = self.state
-        self.state += 1
-        return res
+    def __init__(self):
+        self.states = Counter()
+    def new_state(self, context='_default'):
+        c = self.states[context]
+        self.states[context] += 1
+        return c
 
 class FA(object):
     def __init__(self):
         self.map_ = {}
         self.start = None
         self.accepts = set()
-        self._links = {}
-        self._states = set()
-        self._inputs = set()
     def __repr__(self):
         return str(self._states)
+    def __or__(self, other):
+        new = self.__class__()
+        new.map_ = deepcopy(self.map_)
+        return new
     def is_accept_state(self, state):
         return state in self.accepts
     def get_links(self, state, input_=None, exclusive=''):
-        links = self._links.get(state, set())
+        links = []
+        for (s0, i), s1 in self.map_.items():
+            if s0!=state: continue
+            if isinstance(s1, set):
+                for ns in s1: links.append((i, ns))
+            else:
+                links.append((i, s1))
+
         if input_ is not None:
             links = {link for link in links if link[0]==input_}
         if exclusive is not None:
             links = {link for link in links if link[0]!=exclusive}
         return links
     def link(self, state, input_, nextstate):
-        self._inputs.add(input_)
-        self._states.add(state)
-        self._states.add(nextstate)
-        link = (input_, nextstate)
-        self._links.setdefault(state, set())
-        self._links[state].add(link)
         self._add_map(state, input_, nextstate)
 
 class NFA(FA):
@@ -45,8 +50,14 @@ class NFA(FA):
 
 class DFA(FA):
     def to_table(self):
-        states = list(self._states)
-        inputs = list(self._inputs)
+        states = set()
+        inputs = set()
+        for (state0, input_), state1 in self.map_.items():
+            states.add(state0); states.add(state1)
+            inputs.add(input_)
+
+        states = list(states)
+        inputs = list(inputs)
         states.sort()
         inputs.sort()
         table = [[''] + inputs]
@@ -57,85 +68,145 @@ class DFA(FA):
         args = (state, input_)
         self.map_[args] = nextstate
 
-def convert_nfa2dfa(nfa, factory):
-    newstart, newmap = _convertlink(nfa)
-    return _create_dfa(factory, newmap, nfa, newstart)
-
-def _convertlink(nfa):
-    def extends(nfa, states):
+class Converter():
+    dfaclass = DFA
+    def dfa(self, nfa, factory):
+        newstart, newmap = self._convertlink(nfa)
+        return self._create_dfa(factory, newmap, nfa, newstart)
+    def extends(self, nfa, states):
         res = set(states)
         for state in states:
             links = nfa.get_links(state, input_='', exclusive=None)
             res.update({link[1] for link in links})
 
         return frozenset(res)
+    def _convertlink(self, nfa):
+        newstart = self.extends(nfa, {nfa.start})
+        stack = [newstart]
+        statecache = set()
+        newmap = dict()
+        while stack:
+            curstates = stack.pop()
+            newstates = dict()
+            for nfastate in curstates:
+                links = nfa.get_links(nfastate, input_=None, exclusive='')
+                for input_, state in links:
+                    newstates.setdefault(input_, set())
+                    newstates[input_].add(state)
 
-    newstart = extends(nfa, set([nfa.start]))
-    stack = [newstart]
-    statecache = set()
-    newmap = dict()
-    while stack:
-        curstates = stack.pop()
-        newstates = dict()
-        for nfastate in curstates:
-            links = nfa.get_links(nfastate, input_=None, exclusive='')
-            for input_, state in links:
-                newstates.setdefault(input_, set())
-                newstates[input_].add(state)
+            statecache.add(frozenset(curstates))
+            for input_, states in newstates.items():
+                extended = self.extends(nfa, states)
+                newlink = (curstates, input_)
+                newmap[newlink] =  extended
+                if extended not in statecache:
+                    stack.append(extended)
 
-        statecache.add(frozenset(curstates))
-        for input_, states in newstates.items():
-            extended = extends(nfa, states)
-            newlink = (curstates, input_)
-            newmap[newlink] =  extended
-            if extended not in statecache:
-                stack.append(extended)
-    return newstart, newmap
+        return newstart, newmap
+    def _create_dfa(self, factory, map_, nfa, newstart):
+        def createnumstate(statecache, factory, state):
+            if state not in statecache:
+                numstate = factory.new_state()
+                statecache[state] = numstate
 
-def _create_dfa(factory, map_, nfa, newstart):
-    def createnumstate(statecache, factory, state):
-        if state not in statecache:
-            numstate = factory.new_state()
-            statecache[state] = numstate
+            return statecache[state]
+        def isfinal(state, nfa):
+            return any(nfa.is_accept_state(stat) for stat in state)
 
-        return statecache[state]
+        dfa = self.dfaclass()
+        statecache = dict()
+        newmap = dict()
+        dfa.start = createnumstate(statecache, factory, newstart)
+        for (state0, input_), state1 in map_.items():
+            numstate0 = createnumstate(statecache, factory, state0)
+            if isfinal(state0, nfa):
+                dfa.accepts.add(numstate0)
 
-    def isfinal(state, nfa):
-        return any(nfa.is_accept_state(stat) for stat in state)
+            numstate1 = createnumstate(statecache, factory, state1)
+            dfa.link(numstate0, input_, numstate1)
+            if isfinal(state1, nfa):
+                dfa.accepts.add(numstate1)
 
-    dfa = DFA()
-    statecache = dict()
-    newmap = dict()
-    dfa.start = createnumstate(statecache, factory, newstart)
-    for (state0, input_), state1 in map_.items():
-        numstate0 = createnumstate(statecache, factory, state0)
-        if isfinal(state0, nfa):
-            dfa.accepts.add(numstate0)
+        return dfa
 
-        numstate1 = createnumstate(statecache, factory, state1)
-        dfa.link(numstate0, input_, numstate1)
-        if isfinal(state1, nfa):
-            dfa.accepts.add(numstate1)
+class Engine(object):
+    def __init__(self):
+        self.table = []
 
-    return dfa
+class Expr(Atomic):
+    def __and__(self, other):
+        return qAnd(self, other)
+    def __or__(self, other):
+        return qOr(self, other)
+    def __invert__(self):
+        return qNot(self)
 
-class Operand():
-    pass
-
-class StringEq(Operand):
-    def __init__(self, colname, queryword, statefactory):
+class StringEq(Expr):
+    def __init__(self, colname, queryword):
         self.colname = colname
         self.queryword = queryword
-        self.statefactory = statefactory
-    def create(self):
-        factory = self.statefactory
-        automaton = NFA():
-        automaton.start = factory.new_state()
-        prev = automaton.start
-        for c in self.queryword:
-            nstate = factory.new_state()
-            automaton.link(prev, c, nstate)
-            prev = nstate
+        self.ops = ('=', queryword)
+    def construct(self):
+        eng = Engine()
+        row = dict()
+        row[self.colname] = [self.ops]
+        eng.table.append(row)
+        return eng
 
-        automaton.accepts.add(prev)
+class qAnd(And):
+    def construct(self, factory):
+        children = self.children()
+        children.sort(key=lambda x: list(x.variables)[0].colname)
+        eng = Engine()
+        row = dict()
+        for child in children:
+            e0 = child.construct()
+            for k, v in e0:
+                row.setdefault(k, [])
+                row[k] += v
+
+        eng.table.append(row)
+        return eng
+
+class qOr(Or):
+    def construct(self, factory):
+        automaton = NFAEngine()
+        start = factory.new_state()
+        automaton.start = start
+        children = self.children()
+        nfas = [c.construct(factory) for c in children]
+        for i, nfa0 in enumerate(nfas):
+            automaton.link(start, '', nfa0.start)
+            others = nfas[:i] + nfas[i+1:]
+            for nfa1 in others:
+                for (s, input_), ns in nfa1.map.items():
+                    automaton.link(start, '', s)
+
+        return automaton
+
+class qNot(Not):
+    @property
+    def colname(self):
+        return self.child.colname
+    def invert(self, op):
+        if op=='=':
+            return '!='
+    def construct(self, factory):
+        child = self.child
+        nfa = child.construct(factory)
+        nfa2 = NFAEngine()
+        nfa2.start = nfa.start
+        nfa2 |= nfa
+        newmap = {}
+        for (s, input_), v in nfa.map_.items():
+            input2 = (self.invert(input_[0]), input_[1])
+            newmap[s, input_2] = v
+
+        nfa2.map_ = newmap
+
+        automaton = NFAEngine()
+        start = factory.new_state()
+        automaton |= nfa2
+        automaton.link(start, '', nfa2.start)
+        automaton.accepts = nfa2.accepts
         return automaton
