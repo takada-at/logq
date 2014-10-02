@@ -4,99 +4,20 @@ from collections import Counter, defaultdict
 from itertools import combinations
 from .logic import Atomic, Bool, And, Or, Not
 
-class CsvParser(object):
-    """
-    サンプル実装のパーサー
-    """
-    def __init__(self, fileobj, engine):
-        self.fileobj = fileobj
-        self.engine  = engine
-    def read(self):
-        self.newline()
-        string = self.fileobj.read()
-        for c in string:
-            self.state = self.readc(c, self.state)
-            if self.state==15:
-                yield self.vals
-
-            self.newline()
-    def newline(self):
-        self.col = 0
-        self.state = 0
-        self.buffer = ''
-        self.engine.newline()
-        self.vals = []
-    def readc(self, c, state):
-        if c=='"':
-            if state==0:
-                return 1
-            elif state==1:
-                return 0
-        elif c==',':
-            if state==1: self.buffer+=c; return 1
-            val = self.buffer
-            self.buffer = ''
-            self.vals.append(val)
-            self.col += 1
-            if state!=4 and state!=5:
-                res = engine.match(self.col, self.buffer)
-                if res == Engine.FAIL: return 5
-                elif res == Engine.SUCCESS: return 4
-        elif c=='\n':
-            if state==1: self.buffer+=c; return 1
-            else:
-                val = self.buffer
-                if state!=4 and state!=5:
-                    res = engine.match(self.col, self.buffer)
-                    if res == Engine.FAIL: state=5
-                    elif res == Engine.SUCCESS: state=4
-
-                return state + 10
-        else:
-            self.buffer += c
-            return state
-
-class Engine(object):
-    NORMAL = 0
-    ACCEPT = 1
-    FAIL = 2
-    @classmethod
-    def construct(cls, expr):
-        expr.normalize()
-        opcodes = expr._construct()
-        return cls(opcodes)
-
-    def __init__(self, opcodes):
-        self.opcodes = opcodes
-    def newline(self):
-        self._flag = dict():
-        for i, row in enumerate(self.opcodes.table):
-            self._flag[i] = {k: 0 for k in row.keys()}
-    def match(self, colname, val):
-        res = self._flag
-        for i, row in enumerate(self.opcodes.table):
-            opcodes = row[colname]
-            if all(self.execute_op(op, arg, val) for op, arg in opcodes):
-                del(res[i][colname])
-                if not res[i]: return self.ACCEPT
-            else:
-                del(res[i][colname])
-                if not res[i]:
-                    del(res[i])
-                    if not res: return self.FAIL
-
-        return self.NORMAL
-    def execute_op(self, op, arg, val):
-        if op=="=":
-            return arg==val
-
 class OpCodes(object):
     def __init__(self):
         self.table = [dict()]
+        self.ops = set()
     def add_codes(self, colname, ops):
         d = self.current
         d.setdefault(colname, [])
         d[colname].append(ops)
+        self.ops.add(ops)
+    def __iter__(self):
+        for i, row in enumerate(self, opcodes):
+            for col, ops in row.items():
+                for op in ops:
+                    yield i, col, op
     def new_row(self):
         self.table.append({})
     def add_row(self, row):
