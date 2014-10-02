@@ -21,23 +21,13 @@ col[1]=="hoge" and col[2]=="fuga" or col[5]=="piyo"
 
 ex.
 
-NFA ::
+NFA
 
-A -''-> B
-  -''-> E
-B -(1)hoge-> C
-B -'' -> E
-C -(2)fuga-> [D]
-C -''-> E
-E -(5)piyo-> [F]
+![nfa](./nfa.png)
 
-DFA ::
+DFA
 
-A -(1)hoge->B
-  -(5)piyo->[D]
-B -(2)fuga -> [C]
-B -(5)piyo -> [D]
-C -(5)piyo -> [D]
+![dfa](./dfa.png)
 
 
 ### オートマトン作成のアルゴリズム
