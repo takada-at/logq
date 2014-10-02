@@ -1,41 +1,23 @@
 # -*- coding: utf-8 -*-
 from __future__ import division, print_function, absolute_import
-from .. import engine
+from .. import engine as e
 
-def test_NFA():
-    u"""
-    test for engine.convert_nfa2dfa
-    """
-    fac = engine.StateFactory()
-    nfa = engine.NFA()
-    states = [fac.new_state() for i in range(10)]
-    start = states[0]
-    # sample
-    # 0 -->  1 -a-> 2 -b-> 3 -b-> 4 -d-> 5
-    #   -->  6 -a-> 7 -c-> 8 -c-> 9
-    # dfa:
-    # 0 -a-> 1 -b-> 2 -b-> 3 -d-> 4
-    #          -c-> 5 -c-> 6
-    nfa.start = states[0]
-    nfa.link(start, '', states[1])
-    nfa.link(states[1], 'a', states[2])
-    nfa.link(states[2], 'b', states[3])
-    nfa.link(states[3], 'b', states[4])
-    nfa.link(states[4], 'd', states[5])
-    nfa.accepts.add(states[5])
+def test_Engine():
+    col = [e.Column(i) for i in range(10)]
+    s = col[1]=="hoge"
+    assert isinstance(s, e.StringEq)
+    assert isinstance(s|s, e.qOr)
+    q = (col[1]=="hoge") & (col[2]=="fuga") & (col[4]=="poyo") | (col[2]=="hogera") & (col[5]=="piyo")
+    engine = q.compile()
+    assert engine
+    print(engine.opcodes.table)
+    row = engine.opcodes.table[0]
+    assert row[1] == [("=", "hoge")]
+    assert row[2] == [("=", "fuga")]
+    assert row[4] == [("=", "poyo")]
 
-    nfa.link(start, '', states[6])
-    nfa.link(states[6], 'a', states[7])
-    nfa.link(states[7], 'c', states[8])
-    nfa.link(states[8], 'c', states[9])
-    nfa.accepts.add(states[9])
+    row = engine.opcodes.table[1]
+    assert row[2] == [("=", "hogera")]
+    assert row[5] == [("=", "piyo")]
 
-    assert {('', 1), ('',6)} == nfa.get_links(nfa.start, '', exclusive=None)
-    fac = engine.StateFactory()
-    cvt = engine.Converter()
-    dfa = cvt.dfa(nfa, fac)
-    assert dfa
-    table = dfa.to_table()
-    print(table)
-    assert 8==len(table)
-    assert ['', 'a', 'b', 'c', 'd'] == table[0]
+
