@@ -10,23 +10,58 @@ class Engine():
         self.success_table = success_table
         self.fail_table = fail_table
         self.exprs = exprs
+        self.cols = list(range(len(self.action_table[0])))
+    def formatop(self, op):
+        return " {}{}".format(*op)
+    def format(self):
+        cols = [""] + map(str, self.cols)
+        res = ["\t".join(cols)]
+        for st, row in enumerate(self.action_table):
+            show = [str(st)]
+            for colid, val in enumerate(row):
+                if val==0:
+                    s = ''
+                else:
+                    expr  = self.formatop(self.exprs[val])
+                    succ  = self.success_table[st][colid]
+                    fail  = self.fail_table[st][colid]
+                    if succ==self.success:
+                        succ = '[{}]'.format(succ)
+                    if fail==self.fail:
+                        fail = '[{}]'.format(fail)
+
+                    s = (expr, str(succ), str(fail))
+
+                show.append(",".join(s))
+
+            res.append("\t".join(show))
+
+        return "\n".join(res)
 
 class PosList():
-    def __init__(self, state):
+    def __init__(self, state, excludes=None):
+        if excludes is None: excludes = set()
+        self.excludes = excludes
         self.posdict = dict()
         self._state = state
         self.poslist = []
     def state(self, pos):
         return self.posdict[pos]
-    def nextrow(self, idx, pos):
+    def findright(self, idx, pos):
+        rowstate = pos[0]
+        rowid = pos[1]
+        for pos in self[idx+1:]:
+            if pos[0]==rowstate and pos[1]==rowid:
+                return pos
+
+        return None
+    def failstate(self, pos):
         rowid = pos[1]
         rowstate = pos[0] - (1<<rowid)
-        idx += 1
-        while idx < len(self.poslist):
-            n = self.poslist[idx]
-            if pos[0]==rowstate:
-                return n
-            idx += 1
+        k = (pos[2], rowid) # col, row
+        for pos2 in self:
+            if pos2[0]==rowstate and (pos2[2], pos2[1]) > k:
+                return pos2
 
         return None
     def __getitem__(self, idx):
@@ -39,6 +74,8 @@ class PosList():
         self.poslist.append(pos)
         self.posdict[pos] = self._state
         self._state += 1
+        while self._state in self.excludes:
+            self._state += 1
 
 class EngineFactory():
     def dict2table(self, poslist, cols, dic):
@@ -59,7 +96,6 @@ class EngineFactory():
         self.success_table = dict()
         self.fail_table = dict()
         self.opids = dict()
-        self.opids[None, None] = 0
         cnt = 1
         for op in opcodes.ops:
             if op not in self.opids:
@@ -69,7 +105,7 @@ class EngineFactory():
         start = 0
         success = 1
         fail = 2
-        poslist = PosList(0)
+        poslist = PosList(0, excludes={1,2})
         self._construct_poslist(opcodes.table, cols, poslist)
         for idx, pos in enumerate(poslist):
             state = poslist.state(pos)
@@ -80,24 +116,23 @@ class EngineFactory():
                 self.fail_table[state] = fail
                 break
 
-            nextrow = poslist.nextrow(idx, pos)
+            nextrow = poslist.failstate(pos)
             if nextrow:
                 self.fail_table[state] = poslist.state(nextrow)
             else:
                 self.fail_table[state] = fail
 
-            pos2 = poslist[idx+1]
-            state2 = poslist.state(pos2)
-            rowstate2, rowid2, col2, oppos2, _  = pos2
-            if rowstate==rowstate2 and rowid==rowid2:
-                self.success_table[state] = state2
-            else:
+            right = poslist.findright(idx, pos)
+            if not right:
                 self.success_table[state] = success
+            else:
+                npos = poslist[idx+1]
+                self.success_table[state] = poslist.state(npos)
 
         action_table = self.dict2table(poslist, cols, self.action_table)
         exprs = self.opids.items()
-        exprs.sort()
-        exprs = [k for k, v in exprs]
+        exprs.sort(key=lambda x:x[1])
+        exprs = [None]+[k for k, v in exprs]
         success_table = self.dict2table(poslist, cols, self.success_table)
         fail_table = self.dict2table(poslist, cols, self. fail_table)
         return Engine(start, success, fail, action_table, success_table,
@@ -120,8 +155,9 @@ class EngineFactory():
                         poslist.add(pos)
 
                 if flag:
+                    pass
                     # go next column
-                    pos = (rowstate, rowid, col, oppos+1, 0)
-                    poslist.add(pos)
+                    #pos = (rowstate, rowid, col, oppos+1, 0)
+                    #poslist.add(pos)
 
 

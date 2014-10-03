@@ -12,3 +12,5 @@ def test_EngineFactory():
     cols = [c.colname for c in col]
     eng=fac.construct(opcodes, cols=cols)
     assert eng
+    print('')
+    print(eng.format())
