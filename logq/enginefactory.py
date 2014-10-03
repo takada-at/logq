@@ -11,7 +11,7 @@ class Engine():
         self.fail_table = fail_table
         self.exprs = exprs
         self.cols = list(range(len(self.action_table[0])))
-    def formatop(self, op):
+    def format_op(self, op):
         return " {}{}".format(*op)
     def format(self):
         cols = [""] + map(str, self.cols)
@@ -22,7 +22,7 @@ class Engine():
                 if val==0:
                     s = ''
                 else:
-                    expr  = self.formatop(self.exprs[val])
+                    expr  = self.format_op(self.exprs[val])
                     succ  = self.success_table[st][colid]
                     fail  = self.fail_table[st][colid]
                     if succ==self.success:
@@ -30,9 +30,9 @@ class Engine():
                     if fail==self.fail:
                         fail = '[{}]'.format(fail)
 
-                    s = (expr, str(succ), str(fail))
+                    s = ",".join((expr, str(succ), str(fail)))
 
-                show.append(",".join(s))
+                show.append(s)
 
             res.append("\t".join(show))
 
@@ -90,7 +90,6 @@ class EngineFactory():
             res[st][col] = dic[st]
 
         return res
-
     def construct(self, opcodes, cols):
         self.action_table = dict()
         self.success_table = dict()
@@ -137,13 +136,11 @@ class EngineFactory():
         fail_table = self.dict2table(poslist, cols, self. fail_table)
         return Engine(start, success, fail, action_table, success_table,
                       fail_table, exprs)
-
     def _construct_poslist(self, table, cols, poslist):
         rowstates = range(1, 2**len(table))
         rowstates.reverse()
         for rowstate in rowstates:
             for col in cols:
-                flag = False
                 for rowid, row in enumerate(table):
                     if ((rowstate >> rowid) & 1)==0: continue
                     if col not in row: continue
@@ -153,11 +150,3 @@ class EngineFactory():
                         opid = self.opids[ops]
                         pos = (rowstate, rowid, col, oppos, opid)
                         poslist.add(pos)
-
-                if flag:
-                    pass
-                    # go next column
-                    #pos = (rowstate, rowid, col, oppos+1, 0)
-                    #poslist.add(pos)
-
-
