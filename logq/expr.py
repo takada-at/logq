@@ -2,7 +2,8 @@
 from __future__ import division, print_function, absolute_import
 from collections import Counter, defaultdict
 from itertools import combinations
-from .logic import Atomic, Bool, And, Or, Not
+from .logic import Atomic, Bool, And, Or, Not, QuineMcCluskey
+from .enginefactory import EngineFactory
 
 class OpCodes(object):
     def __init__(self):
@@ -34,18 +35,23 @@ class OpCodes(object):
     def current(self, row):
         self.table[-1] = row
 
-class BaseBool(Bool):
+class Expr(Bool):
     def __and__(self, other):
         return qAnd(self, other)
     def __or__(self, other):
         return qOr(self, other)
     def __invert__(self):
         return qNot(self)
-    def compile(self):
-        engine = Engine.construct(self)
+    def compile(self, cols):
+        expr = self.normalize()
+        obj = QuineMcCluskey(expr)
+        expr = obj.compute()
+        opcodes = expr._construct()
+        factory = EngineFactory()
+        engine  = factory.construct(opcodes, cols=cols)
         return engine
 
-class Expr(BaseBool, Atomic):
+class qAtomic(Expr, Atomic):
     def _construct(self):
         eng = OpCodes()
         eng.add_codes(self.colname, self.ops)
@@ -57,14 +63,14 @@ class Column(object):
     def __eq__(self, other):
         return StringEq(self.colname, other)
 
-class StringEq(Expr):
+class StringEq(qAtomic):
     def __init__(self, colname, queryword):
         self.name = "col_{} = '{}'".format(colname, queryword)
         self.colname = colname
         self.ops = ('=', queryword)
         self.args = set([self])
 
-class qNot(BaseBool, Not):
+class qNot(Expr, Not):
     @property
     def colname(self):
         return self.child.colname
@@ -90,7 +96,7 @@ class qNot(BaseBool, Not):
 
         return eng0
 
-class qAnd(BaseBool, And):
+class qAnd(Expr, And):
     def _construct(self):
         children = self.children()
         children.sort(key=lambda x: list(x.variables)[0].colname)
@@ -101,7 +107,7 @@ class qAnd(BaseBool, And):
 
         return eng
 
-class qOr(BaseBool, Or):
+class qOr(Expr, Or):
     def _construct(self):
         children = self.children()
         eng = OpCodes()

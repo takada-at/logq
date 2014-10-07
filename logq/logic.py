@@ -332,15 +332,15 @@ class QuineMcCluskey(object):
         return res
     def _merge(self, terms):
         mergedterms = set()
-        pairl = []
+        pairs = set()
         for (i, term0), (j, term1) in combinations(enumerate(terms), 2):
             merged = term0.try_merge(term1)
             if merged:
                 mergedterms.add(i); mergedterms.add(j)
-                pairl.append(merged)
+                pairs.add(merged)
 
         marked = [term for i, term in enumerate(terms) if i not in mergedterms]
-        return (pairl, marked)
+        return (pairs, marked)
     def _create_implicant_chart(self, implicants):
         table = dict()
         for term in implicants:
@@ -388,6 +388,10 @@ class MergeTree(object):
         self.ids   = ids  # {0,}
         self.expr  = expr # [0, 1, 1]
         self._len = len([c for c in expr if c!= self.CHAR])
+    def __hash__(self):
+        return hash("".join(map(str, self.expr)))
+    def __eq__(self, other):
+        return self.ids == other.ids
     def __len__(self):
         return self._len
     def boolean(self, variables):

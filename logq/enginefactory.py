@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 from __future__ import division, print_function, absolute_import
 
-class Engine():
+class Engine(object):
     def __init__(self, start, success, fail, action_table, success_table, fail_table, exprs):
         self.start = start
         self.success = success
@@ -11,6 +11,15 @@ class Engine():
         self.fail_table = fail_table
         self.exprs = exprs
         self.cols = list(range(len(self.action_table[0])))
+        self.state = start
+    def reset(self):
+        self.state = self.start
+    @property
+    def is_success(self):
+        return self.state==self.success
+    @property
+    def is_fail(self):
+        return self.state==self.success
     def format_op(self, op):
         return " {}{}".format(*op)
     def format(self):
@@ -37,6 +46,27 @@ class Engine():
             res.append("\t".join(show))
 
         return "\n".join(res)
+    def execute_op(self, op, arg, val):
+        if op=='=':
+            return arg==val
+    def read(self, col, val):
+        s = True
+        while s:
+            s = self.transition(col, val)
+    def transition(self, col, val):
+        state = self.state
+        opid = self.action_table[state][col]
+        if opid:
+            op, arg = self.exprs[opid]
+            res = self.execute_op(op, arg, val)
+            if res:
+                self.state = self.success_table[state][col]
+            else:
+                self.state = self.fail_table[state][col]
+
+            return self.state
+        else:
+            return None
 
 class PosList():
     def __init__(self, state, excludes=None):
@@ -48,6 +78,9 @@ class PosList():
     def state(self, pos):
         return self.posdict[pos]
     def findright(self, idx, pos):
+        """
+        状態が同じで、行が同じものがあるかどうかを探す。
+        """
         rowstate = pos[0]
         rowid = pos[1]
         for pos in self[idx+1:]:
@@ -56,6 +89,11 @@ class PosList():
 
         return None
     def failstate(self, pos):
+        """
+        失敗した場合
+
+        行の状態を失敗にして、同じ列でこれよりあとの行か、次の列を検索
+        """
         rowid = pos[1]
         rowstate = pos[0] - (1<<rowid)
         k = (pos[2], rowid) # col, row
