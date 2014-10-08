@@ -2,15 +2,15 @@
 from __future__ import division, print_function, absolute_import
 
 class Engine(object):
-    def __init__(self, start, success, fail, action_table, success_table, fail_table, exprs):
+    def __init__(self, start, success, fail, exprs, expr_table, success_table, fail_table):
         self.start = start
         self.success = success
         self.fail = fail
-        self.action_table = action_table
+        self.expr_table = expr_table
         self.success_table = success_table
         self.fail_table = fail_table
         self.exprs = exprs
-        self.cols = list(range(len(self.action_table[0])))
+        self.cols = list(range(len(self.expr_table[0])))
         self.state = start
     def reset(self):
         self.state = self.start
@@ -25,7 +25,7 @@ class Engine(object):
     def format(self):
         cols = [""] + map(str, self.cols)
         res = ["\t".join(cols)]
-        for st, row in enumerate(self.action_table):
+        for st, row in enumerate(self.expr_table):
             show = [str(st)]
             for colid, val in enumerate(row):
                 if val==0:
@@ -55,7 +55,7 @@ class Engine(object):
             s = self.transition(col, val)
     def transition(self, col, val):
         state = self.state
-        opid = self.action_table[state][col]
+        opid = self.expr_table[state][col]
         if opid:
             op, arg = self.exprs[opid]
             res = self.execute_op(op, arg, val)
@@ -129,7 +129,7 @@ class EngineFactory():
 
         return res
     def construct(self, opcodes, cols):
-        self.action_table = dict()
+        self.expr_table = dict()
         self.success_table = dict()
         self.fail_table = dict()
         self.opids = dict()
@@ -147,7 +147,7 @@ class EngineFactory():
         for idx, pos in enumerate(poslist):
             state = poslist.state(pos)
             rowstate, rowid, col, oppos, opid = pos
-            self.action_table[state] = opid
+            self.expr_table[state] = opid
             if idx==len(poslist)-1:
                 self.success_table[state] = success
                 self.fail_table[state] = fail
@@ -166,14 +166,13 @@ class EngineFactory():
                 npos = poslist[idx+1]
                 self.success_table[state] = poslist.state(npos)
 
-        action_table = self.dict2table(poslist, cols, self.action_table)
+        expr_table = self.dict2table(poslist, cols, self.expr_table)
         exprs = self.opids.items()
         exprs.sort(key=lambda x:x[1])
         exprs = [None]+[k for k, v in exprs]
         success_table = self.dict2table(poslist, cols, self.success_table)
         fail_table = self.dict2table(poslist, cols, self. fail_table)
-        return Engine(start, success, fail, action_table, success_table,
-                      fail_table, exprs)
+        return Engine(start, success, fail, exprs, expr_table, success_table, fail_table)
     def _construct_poslist(self, table, cols, poslist):
         rowstates = range(1, 2**len(table))
         rowstates.reverse()
