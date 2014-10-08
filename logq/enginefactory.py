@@ -19,7 +19,7 @@ class PyEngine(object):
         return self.state==self.success
     @property
     def is_fail(self):
-        return self.state==self.success
+        return self.state==self.fail
     def format_op(self, op):
         return " {}{}".format(*op)
     def format(self):

@@ -35,7 +35,6 @@ Engine_dealloc(Engine* self)
     for(i=1; i<self->exprsize; ++i){
         tmp = self->exprs + i;
         free(tmp->arg);
-        free(self->exprs + i);
     }
     free(self->exprs);
     free(self->expr_table);
@@ -89,7 +88,7 @@ construct_expr(PyObject *pyexpr)
     argsize = (int)strlen(py_arg) + 1;
     arg  = malloc(sizeof(char) * argsize);
     expr = malloc(sizeof(expr));
-    if(arg==NULL || expr)
+    if(arg==NULL || expr == NULL)
         return NULL;
 
     strcpy(arg, py_arg);
@@ -98,7 +97,7 @@ construct_expr(PyObject *pyexpr)
     return expr;
 }
 
-static PyObject *
+static int
 Engine_init(Engine *self, PyObject *args, PyObject *kwargs)
 {
     int start;
@@ -109,7 +108,6 @@ Engine_init(Engine *self, PyObject *args, PyObject *kwargs)
     int exprsize;
     int i = 0;
     int j = 0;
-    int val;
     PyObject *py_exprs = NULL;
     PyObject *py_expr_table = NULL;
     PyObject *py_success_table = NULL;
@@ -129,7 +127,7 @@ Engine_init(Engine *self, PyObject *args, PyObject *kwargs)
                                      &py_expr_table,
                                      &py_success_table,
                                      &py_fail_table))
-        return NULL;
+        return -1;
 
     colsize       = (int)PyList_Size(PyList_GetItem(py_expr_table, 0));
     statesize     = (int)PyList_Size(py_expr_table);
@@ -140,25 +138,22 @@ Engine_init(Engine *self, PyObject *args, PyObject *kwargs)
     fail_table    = malloc( sizeof(int) * statesize * colsize);
     if(exprs == NULL || expr_table == NULL || success_table == NULL
        || fail_table == NULL)
-        return PyErr_NoMemory();
+        return -1;
 
     for(i=1; i<exprsize; ++i){
         py_expr = PyList_GetItem(py_exprs, i);
         if(!PyTuple_Check(py_expr))
-            return NULL;
+            return -1;
         expr = construct_expr(py_expr);
         if(expr==NULL)
-            return NULL;
+            return -1;
         exprs[i] = *expr;
     }
     for(i=0; i<statesize; ++i){
         for(j=0; j<colsize; ++j){
-            val = (int)PyInt_AsLong(PyList_GetItem(PyList_GetItem(py_expr_table, i), j));
-            expr_table[i*colsize + j]    = val;
-            val = (int)PyInt_AsLong(PyList_GetItem(PyList_GetItem(py_success_table, i), j));
-            success_table[i*colsize + j] = val;
-            val = (int)PyInt_AsLong(PyList_GetItem(PyList_GetItem(py_fail_table, i), j));
-            fail_table[i*colsize + j]    = val;
+            expr_table[i*colsize + j]    = (int)PyInt_AsLong(PyList_GetItem(PyList_GetItem(py_expr_table, i), j));
+            success_table[i*colsize + j] = (int)PyInt_AsLong(PyList_GetItem(PyList_GetItem(py_success_table, i), j));
+            fail_table[i*colsize + j]    = (int)PyInt_AsLong(PyList_GetItem(PyList_GetItem(py_fail_table, i), j));
         }
     }
     self->start      = start;
@@ -174,7 +169,7 @@ Engine_init(Engine *self, PyObject *args, PyObject *kwargs)
     self->success_table = success_table;
     self->fail_table    = fail_table;
     self->exprs         = exprs;
-    return (PyObject *)self;
+    return 0;
 }
 
 static int execute_expr(Expr *expr, const char *val)
@@ -218,6 +213,14 @@ Engine_transition(Engine* self, PyObject *args)
     Py_RETURN_NONE;
 }
 
+static PyObject *
+Engine_reset(Engine *self){
+    self->is_success = 0;
+    self->is_fail = 0;
+    self->state = self->start;
+    Py_RETURN_NONE;
+}
+
 static PyMemberDef Engine_members[] = {
     {"state",   T_INT, offsetof(Engine, state), READONLY },
     {"start",   T_INT, offsetof(Engine, start), READONLY },
@@ -231,6 +234,9 @@ static PyMemberDef Engine_members[] = {
 static struct PyMethodDef Engine_methods[] = {
     {"transition", (PyCFunction)Engine_transition, METH_VARARGS,
      "Engine transition"
+    },
+    {"reset", (PyCFunction)Engine_reset, METH_NOARGS,
+     "Engine reset"
     },
     {NULL}
 };
