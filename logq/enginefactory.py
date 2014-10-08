@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 from __future__ import division, print_function, absolute_import
 
-class Engine(object):
+class PyEngine(object):
     def __init__(self, start, success, fail, exprs, expr_table, success_table, fail_table):
         self.start = start
         self.success = success
@@ -49,24 +49,18 @@ class Engine(object):
     def execute_op(self, op, arg, val):
         if op=='=':
             return arg==val
-    def read(self, col, val):
-        s = True
-        while s:
-            s = self.transition(col, val)
     def transition(self, col, val):
-        state = self.state
-        opid = self.expr_table[state][col]
-        if opid:
-            op, arg = self.exprs[opid]
-            res = self.execute_op(op, arg, val)
-            if res:
-                self.state = self.success_table[state][col]
+        while True:
+            opid = self.expr_table[self.state][col]
+            if opid:
+                op, arg = self.exprs[opid]
+                res = self.execute_op(op, arg, val)
+                if res:
+                    self.state = self.success_table[self.state][col]
+                else:
+                    self.state = self.fail_table[self.state][col]
             else:
-                self.state = self.fail_table[state][col]
-
-            return self.state
-        else:
-            return None
+                return None
 
 class PosList():
     def __init__(self, state, excludes=None):
@@ -116,6 +110,7 @@ class PosList():
             self._state += 1
 
 class EngineFactory():
+    engineclass = PyEngine
     def dict2table(self, poslist, cols, dic):
         res = []
         last = poslist.state(poslist[-1])
@@ -172,7 +167,8 @@ class EngineFactory():
         exprs = [None]+[k for k, v in exprs]
         success_table = self.dict2table(poslist, cols, self.success_table)
         fail_table = self.dict2table(poslist, cols, self. fail_table)
-        return Engine(start, success, fail, exprs, expr_table, success_table, fail_table)
+        klass = self.engineclass
+        return klass(start, success, fail, exprs, expr_table, success_table, fail_table)
     def _construct_poslist(self, table, cols, poslist):
         rowstates = range(1, 2**len(table))
         rowstates.reverse()

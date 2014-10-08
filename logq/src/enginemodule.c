@@ -1,10 +1,11 @@
 #define MODULE_VERSION "0.0.1"
+#define STR_EQ 1
 
 #include <Python.h>
 #include <structmember.h>
 
 typedef struct {
-    char *op;
+    int op;
     char *arg;
 } Expr;
 
@@ -15,6 +16,8 @@ typedef struct {
     int success;
     int fail;
     int state;
+    int is_success;
+    int is_fail;
     int colsize;
     int statesize;
     int exprsize;
@@ -31,7 +34,6 @@ Engine_dealloc(Engine* self)
     Expr *tmp;
     for(i=0; i<self->exprsize; ++i){
         tmp = self->exprs + i;
-        free(tmp->op);
         free(tmp->arg);
         free(self->exprs + i);
     }
@@ -53,6 +55,13 @@ static char *engine_kws[] = {
     NULL
 };
 
+static int op2int(const char *op){
+    if(strcmp(op, "=")==0)
+        return STR_EQ;
+
+    return 0;
+}
+
 static PyObject *
 Engine_new(PyTypeObject *type, PyObject *args, PyObject *kwargs)
 {
@@ -69,26 +78,22 @@ Engine_new(PyTypeObject *type, PyObject *args, PyObject *kwargs)
 static Expr *
 construct_expr(PyObject *pyexpr)
 {
-    int opsize, argsize;
-    char *py_op;
-    char *py_arg;
-    char *op;
+    int argsize;
+    const char *py_op;
+    const char *py_arg;
     char *arg;
     Expr *expr;
     if(!PyArg_ParseTuple(pyexpr, "ss", &py_op, &py_arg))
         return NULL;
 
-    opsize  = strlen(py_op) + 1;
-    argsize = strlen(py_arg) + 1;
-    op   = malloc(sizeof(char) * opsize);
+    argsize = (int)strlen(py_arg) + 1;
     arg  = malloc(sizeof(char) * argsize);
     expr = malloc(sizeof(expr));
-    if(op==NULL || arg==NULL || expr)
+    if(arg==NULL || expr)
         return NULL;
 
-    strcpy(op, py_op);
     strcpy(arg, py_arg);
-    expr->op = op;
+    expr->op = op2int(py_op);
     expr->arg = arg;
     return expr;
 }
@@ -102,7 +107,8 @@ Engine_init(Engine *self, PyObject *args, PyObject *kwargs)
     int colsize;
     int statesize;
     int exprsize;
-    int i, j;
+    int i = 0;
+    int j = 0;
     int val;
     PyObject *py_exprs = NULL;
     PyObject *py_expr_table = NULL;
@@ -125,9 +131,9 @@ Engine_init(Engine *self, PyObject *args, PyObject *kwargs)
                                      &py_fail_table))
         return NULL;
 
-    colsize          = PyList_Size(PyList_GetItem(py_expr_table, 0));
-    statesize        = PyList_Size(py_expr_table);
-    exprsize         = PyList_Size(py_exprs);
+    colsize       = (int)PyList_Size(PyList_GetItem(py_expr_table, 0));
+    statesize     = (int)PyList_Size(py_expr_table);
+    exprsize      = (int)PyList_Size(py_exprs);
     exprs         = malloc( sizeof(Expr) * exprsize );
     expr_table    = malloc( sizeof(int) * statesize * colsize);
     success_table = malloc( sizeof(int) * statesize * colsize);
@@ -136,7 +142,8 @@ Engine_init(Engine *self, PyObject *args, PyObject *kwargs)
        || fail_table == NULL)
         return PyErr_NoMemory();
 
-    for(i=0; i<exprsize; ++i){
+    exprs = NULL;
+    for(i=1; i<exprsize; ++i){
         py_expr = PyList_GetItem(PyList_GetItem(py_expr_table, i), j);
         expr = construct_expr(py_expr);
         if(expr==NULL)
@@ -156,8 +163,10 @@ Engine_init(Engine *self, PyObject *args, PyObject *kwargs)
             fail_table[i*colsize + j]    = val;
         }
     }
-    self->start     = start;
-    self->state     = start;
+    self->start      = start;
+    self->state      = start;
+    self->is_success = 0;
+    self->is_fail    = 0;
     self->success   = success;
     self->fail      = fail;
     self->colsize   = colsize;
@@ -170,15 +179,61 @@ Engine_init(Engine *self, PyObject *args, PyObject *kwargs)
     return (PyObject *)self;
 }
 
+static int execute_expr(Expr *expr, const char *val)
+{
+    switch(expr->op){
+    case STR_EQ:
+        if(strcmp(expr->arg, val) == 0){
+            return 1;
+        }else
+            return 0;
+        break;
+    }
+    return 0;
+}
+
+static PyObject *
+Engine_transition(Engine* self, PyObject *args)
+{
+    int col;
+    const char *val;
+    int expr_id;
+    Expr *expr;
+    if (!PyArg_ParseTuple(args, "is", &col, &val))
+        return NULL;
+
+    while(1){
+        expr_id = self->expr_table[self->state * self->colsize + col];
+        if(expr_id){
+            expr = self->exprs + expr_id;
+            if(execute_expr(expr, val)){
+                self->state = self->success_table[self->state * self->colsize + col];
+                self->is_success = self->state==self->success;
+            }else{
+                self->state = self->fail_table[self->state * self->colsize + col];
+                self->is_fail = self->state==self->fail;
+            }
+        }else{
+            Py_RETURN_NONE;
+        }
+    }
+    Py_RETURN_NONE;
+}
+
 static PyMemberDef Engine_members[] = {
     {"state",   T_INT, offsetof(Engine, state), READONLY },
     {"start",   T_INT, offsetof(Engine, start), READONLY },
     {"success", T_INT, offsetof(Engine, success), READONLY },
     {"fail",    T_INT, offsetof(Engine, fail), READONLY },
+    {"is_success",   T_INT, offsetof(Engine, is_success), READONLY },
+    {"is_fail",   T_INT, offsetof(Engine, is_fail), READONLY },
     {NULL}
 };
 
 static struct PyMethodDef Engine_methods[] = {
+    {"transition", (PyCFunction)Engine_transition, METH_VARARGS,
+     "Engine transition"
+    },
     {NULL}
 };
 

@@ -1,15 +1,29 @@
 # -*- coding: utf-8 -*-
 from __future__ import absolute_import, division, print_function
 
-from distutils.core import setup, Extension
+from setuptools import setup, find_packages, Extension
+
+from setuptools.command.test import test as TestCommand
+
+class PyTest(TestCommand):
+    def finalize_options(self):
+        TestCommand.finalize_options(self)
+        self.test_args = []
+        self.test_suite = True
+    def run_tests(self):
+        import pytest
+        pytest.main(self.test_args)
 
 setup(name='logq',
       version='0.0.1',
       description='',
       author='takada-at',
       author_email='takada-at@klab.com',
-      packages=['logq', 'logq.test'],
+      packages=find_packages(),
       ext_modules=[
-        Extension('logq.engine', ['logq/src/cenginemodule.c'])
-        ],
-     )
+        Extension('logq.engine', ['logq/src/enginemodule.c'])
+      ],
+    tests_require=['pytest'],
+    cmdclass = {'test': PyTest},
+)
+

@@ -48,21 +48,21 @@ def test_Engine():
     eng = q.compile(list(range(len(col))))
     assert eng
     for colid, c in enumerate(['aa', 'hoge', 'fuga', 'bbb', 'poyo', 'fa']):
-        eng.read(colid, c)
+        eng.transition(colid, c)
         if eng.is_success: break
 
     assert eng.is_success
 
     eng.reset()
     for colid, c in enumerate(['aa', 'hoge', 'hogera', 'bbb', 'poyo', 'piyo']):
-        eng.read(colid, c)
+        eng.transition(colid, c)
         if eng.is_success: break
 
     assert eng.is_success
 
 
     for colid, c in enumerate(['aa', 'hoge', 'hogera', 'bbb', 'poyo', 'uuu']):
-        eng.read(colid, c)
+        eng.transition(colid, c)
         if eng.is_success: break
         if eng.is_fail: break
 
