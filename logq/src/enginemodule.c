@@ -153,14 +153,11 @@ Engine_init(Engine *self, PyObject *args, PyObject *kwargs)
     }
     for(i=0; i<statesize; ++i){
         for(j=0; j<colsize; ++j){
-            if(!PyArg_Parse(PyList_GetItem(PyList_GetItem(py_expr_table, i), j), "i", &val))
-                return NULL;
+            val = (int)PyInt_AsLong(PyList_GetItem(PyList_GetItem(py_expr_table, i), j));
             expr_table[i*colsize + j]    = val;
-            if(!PyArg_Parse(PyList_GetItem(PyList_GetItem(py_success_table, i), j), "i", &val))
-                return NULL;
+            val = (int)PyInt_AsLong(PyList_GetItem(PyList_GetItem(py_success_table, i), j));
             success_table[i*colsize + j] = val;
-            if(!PyArg_Parse(PyList_GetItem(PyList_GetItem(py_fail_table, i), j), "i", &val))
-                return NULL;
+            val = (int)PyInt_AsLong(PyList_GetItem(PyList_GetItem(py_fail_table, i), j));
             fail_table[i*colsize + j]    = val;
         }
     }
@@ -204,14 +201,14 @@ Engine_transition(Engine* self, PyObject *args)
         return NULL;
 
     while(1){
-        expr_id = self->expr_table[self->state * self->colsize + col];
+        expr_id = self->expr_table[(self->state) * (self->colsize) + col];
         if(expr_id){
             expr = self->exprs + expr_id;
             if(execute_expr(expr, val)){
-                self->state = self->success_table[self->state * self->colsize + col];
+                self->state = self->success_table[(self->state) * (self->colsize) + col];
                 self->is_success = self->state==self->success;
             }else{
-                self->state = self->fail_table[self->state * self->colsize + col];
+                self->state = self->fail_table[(self->state) * (self->colsize) + col];
                 self->is_fail = self->state==self->fail;
             }
         }else{
