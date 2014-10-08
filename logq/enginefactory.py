@@ -167,6 +167,7 @@ class EngineFactory():
         exprs = [None]+[k for k, v in exprs]
         success_table = self.dict2table(poslist, cols, self.success_table)
         fail_table = self.dict2table(poslist, cols, self. fail_table)
+        print(start, success, fail, exprs, expr_table, success_table, fail_table)
         klass = self.engineclass
         return klass(start, success, fail, exprs, expr_table, success_table, fail_table)
     def _construct_poslist(self, table, cols, poslist):

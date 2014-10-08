@@ -32,7 +32,7 @@ Engine_dealloc(Engine* self)
 {
     int i;
     Expr *tmp;
-    for(i=0; i<self->exprsize; ++i){
+    for(i=1; i<self->exprsize; ++i){
         tmp = self->exprs + i;
         free(tmp->arg);
         free(self->exprs + i);
@@ -142,9 +142,10 @@ Engine_init(Engine *self, PyObject *args, PyObject *kwargs)
        || fail_table == NULL)
         return PyErr_NoMemory();
 
-    exprs = NULL;
     for(i=1; i<exprsize; ++i){
-        py_expr = PyList_GetItem(PyList_GetItem(py_expr_table, i), j);
+        py_expr = PyList_GetItem(py_exprs, i);
+        if(!PyTuple_Check(py_expr))
+            return NULL;
         expr = construct_expr(py_expr);
         if(expr==NULL)
             return NULL;

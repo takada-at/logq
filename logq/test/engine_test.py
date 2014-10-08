@@ -12,11 +12,12 @@ def test_cEngine():
     eng = q.compile(list(range(len(col))))
     assert isinstance(eng, engine.Engine)
     assert eng
-    # for colid, c in enumerate(['aa', 'hoge', 'fuga', 'bbb', 'poyo', 'fa']):
-    #     s = True;
-    #     while s:
-    #         s = eng.transition(colid, c)
+    for colid, c in enumerate(['aa', 'hoge', 'fuga', 'bbb', 'poyo', 'fa']):
+        s = True;
+        while s:
+            s = eng.transition(colid, c)
 
-    #     if eng.is_success: break
+        if eng.is_success: break
 
-    # assert eng.is_success
+    assert eng.is_success
+    ef.EngineFactory.engineclass = ef.PyEngine

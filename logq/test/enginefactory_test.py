@@ -4,6 +4,7 @@ from .. import enginefactory as ef
 from .. import expr as e
 
 def test_EngineFactory():
+    reload(ef)
     fac = ef.EngineFactory()
     col = [e.Column(i) for i in range(10)]
     q = (col[1]=="hoge") & (col[2]=="fuga") & (col[4]=="poyo") | (col[2]=="hogera") & (col[5]=="piyo")
@@ -42,7 +43,9 @@ def test_EngineFactory():
     assert eng.success == eng.success_table[state][col]
 
 def test_Engine():
+    reload(ef)
     fac = ef.EngineFactory()
+    ef.EngineFactory.engineclass = ef.PyEngine
     col = [e.Column(i) for i in range(10)]
     q = (col[1]=="hoge") & (col[2]=="fuga") & (col[4]=="poyo") | (col[2]=="hogera") & (col[5]=="piyo")
     eng = q.compile(list(range(len(col))))
@@ -67,4 +70,5 @@ def test_Engine():
         if eng.is_fail: break
 
     assert eng.is_fail
+    print("hoge")
 
