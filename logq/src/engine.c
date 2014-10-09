@@ -74,27 +74,27 @@ Engine_new(PyTypeObject *type, PyObject *args, PyObject *kwargs)
     return (PyObject *)self;
 }
 
-static Expr *
-construct_expr(PyObject *pyexpr)
+static int
+construct_expr(Expr *exprs, PyObject *pyexpr)
 {
     int argsize;
     const char *py_op;
     const char *py_arg;
     char *arg;
-    Expr *expr;
+    Expr expr;
     if(!PyArg_ParseTuple(pyexpr, "ss", &py_op, &py_arg))
-        return NULL;
+        return 0;
 
     argsize = (int)strlen(py_arg) + 1;
     arg  = malloc(sizeof(char) * argsize);
-    expr = malloc(sizeof(expr));
-    if(arg==NULL || expr == NULL)
-        return NULL;
+    if(arg==NULL)
+        return 0;
 
     strcpy(arg, py_arg);
-    expr->op = op2int(py_op);
-    expr->arg = arg;
-    return expr;
+    expr.op = op2int(py_op);
+    expr.arg = arg;
+    *exprs = expr;
+    return 1;
 }
 
 static int
@@ -144,10 +144,9 @@ Engine_init(Engine *self, PyObject *args, PyObject *kwargs)
         py_expr = PyList_GetItem(py_exprs, i);
         if(!PyTuple_Check(py_expr))
             return -1;
-        expr = construct_expr(py_expr);
-        if(expr==NULL)
+
+        if(construct_expr(exprs+i, py_expr)==0)
             return -1;
-        exprs[i] = *expr;
     }
     for(i=0; i<statesize; ++i){
         for(j=0; j<colsize; ++j){
