@@ -16,14 +16,6 @@ staticforward PyTypeObject CSVParser_Type;
 
 #define CSVParser_Check(v)   (Py_TYPE(v) == &CSVParser_Type)
 
-static char *reader_kws[] = {
-    "engine",
-    "file",
-    "delimiter",
-    "quotechar",
-    NULL
-};
-
 static int
 parse_save_field(CSVParser *self)
 {
@@ -237,14 +229,22 @@ parse_reset(CSVParser *self)
     return 0;
 }
 
+static char *parser_kws[] = {
+    "engine",
+    "file",
+    "delimiter",
+    "quotechar",
+    NULL
+};
+
 static PyObject *
 CSVParser_new(PyTypeObject *type, PyObject *args, PyObject *kwargs)
 {
     Engine *engine;
     PyObject *pyfile  = NULL;
     FILE *file = NULL;
-    char delimiter;
-    char quotechar;
+    char delimiter = ',';
+    char quotechar = '"';
     CSVParser * self = PyObject_GC_New(CSVParser, &CSVParser_Type);
 
     if (self == NULL){
@@ -252,23 +252,20 @@ CSVParser_new(PyTypeObject *type, PyObject *args, PyObject *kwargs)
     }
 
     if (!PyArg_ParseTupleAndKeywords(args, kwargs,
-                                     "O!Occ", reader_kws,
+                                     "O!O|cc", parser_kws,
                                      &Engine_Type, &engine,
                                      &pyfile,
                                      &delimiter, &quotechar)){
-        Py_DECREF(self);
         return NULL;
     }
     if(!PyFile_Check(pyfile)){
-        Py_DECREF(self);
         return NULL;
     }
     file = PyFile_AsFile(pyfile);
-    PyFile_IncUseCount((PyFileObject *)pyfile);
     Py_INCREF(pyfile);
     Py_INCREF(engine);
     self->engine = engine;
-    self->pyfile = pyfile;
+    self->pyfile = (PyFileObject *)pyfile;
     self->file   = file;
     self->fields = NULL;
     self->field  = NULL;
@@ -277,7 +274,6 @@ CSVParser_new(PyTypeObject *type, PyObject *args, PyObject *kwargs)
     self->delimiter = delimiter;
     self->quotechar = quotechar;
     if (parse_reset(self) < 0) {
-        PyFile_DecUseCount((PyFileObject *)pyfile);
         Py_DECREF(pyfile);
         Py_DECREF(engine);
         Py_DECREF(self);
@@ -297,13 +293,16 @@ CSVParser_iternext(CSVParser *self)
     PyObject *fields = NULL;
     long i;
     long linelen;
+    Engine_reset(self->engine);
     while(!self->engine->is_success){
         if (parse_reset(self) < 0)
             return NULL;
         do {
+            PyFile_IncUseCount(self->pyfile);
             Py_BEGIN_ALLOW_THREADS
             cp = fgets(buf, MAXBUFSIZE, self->file);
             Py_END_ALLOW_THREADS
+            PyFile_DecUseCount(self->pyfile);
             if (cp == NULL) {
                 /* End of input OR exception */
                 if (!PyErr_Occurred() && (self->field_len != 0 ||
@@ -346,7 +345,6 @@ CSVParser_dealloc(CSVParser *self)
     Py_XDECREF(self->pyfile);
     Py_XDECREF(self->engine);
     Py_XDECREF(self->fields);
-    PyFile_DecUseCount((PyFileObject *)self->pyfile);
     if (self->field != NULL)
         PyMem_Free(self->field);
 

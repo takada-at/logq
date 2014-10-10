@@ -169,6 +169,9 @@ static int execute_expr(Expr *expr, const char *val)
 
 int
 Engine_read(Engine *self, int col, const char* val){
+    if(col >= self->colsize)
+        return 0;
+
     Expr *expr;
     int expr_id;
     while(1){

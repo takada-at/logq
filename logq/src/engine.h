@@ -28,5 +28,5 @@ typedef struct {
 
 int Engine_read(Engine *self, int col, const char* val);
 
-PyObject * Engine_reset(Engine *self);
+PyObject* Engine_reset(Engine *self);
 #endif

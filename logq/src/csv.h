@@ -11,7 +11,7 @@ typedef struct {
     PyObject_HEAD
 
     Engine *engine;
-    PyObject *pyfile;
+    PyFileObject *pyfile;
     FILE *file;
     PyObject *fields;           /* field list for current record */
     ParserState state;          /* current CSV parse state */
