@@ -21,7 +21,8 @@ setup(name='logq',
       author_email='takada-at@klab.com',
       packages=find_packages(),
       ext_modules=[
-        Extension('logq.engine', ['logq/src/engine.c'], include_dirs=['logq/include/'])
+        Extension('logq.engine', ['logq/src/engine.c'],
+                  include_dirs=['logq/include/'])
       ],
     tests_require=['pytest'],
     cmdclass = {'test': PyTest},
