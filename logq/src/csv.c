@@ -179,10 +179,12 @@ parse_process_char(CSVParser *self, char c)
                 self->state = QUERY_FAIL;
             else
                 self->state = START_FIELD;
+        }else{
+            if(parse_add_char(self, c) < 0)
+                return -1;
+
+            self->state = IN_FIELD;
         }
-        if (parse_add_char(self, c) < 0)
-            return -1;
-        self->state = IN_FIELD;
         break;
 
     case EAT_CRNL:

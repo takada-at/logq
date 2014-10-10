@@ -62,6 +62,7 @@ def test_csv():
               "1,hoge,fuga,4,poyo,6\n"\
               "a,b,hogera,1,2,piyo\n"\
     )
+    tmp.write('a,fasfafafab,hogera,"1\nabc","b""abc",piyo\n')
     fileobj = tmp.file
     fileobj.seek(0)
     ef.EngineFactory.engineclass = engine.Engine
@@ -71,5 +72,7 @@ def test_csv():
     parser = engine.CSVParser(eng, fileobj)
     assert parser
     res = list(parser)
-    assert 3==len(res)
-    assert [['a', 'b', 'hogera', '1', '2', 'piyo'], ['1', 'hoge', 'fuga', '4', 'poyo', '6'], ['a', 'b', 'hogera', '1', '2', 'piyo']] == res
+    assert 4==len(res)
+    assert [['a', 'b', 'hogera', '1', '2', 'piyo'], ['1', 'hoge', 'fuga', '4', 'poyo', '6'], ['a', 'b', 'hogera', '1', '2', 'piyo']] == res[:3]
+    print(res[3][4])
+    assert ['a','fasfafafab','hogera',"1\nabc","b\"abc",'piyo'] == res[3]
