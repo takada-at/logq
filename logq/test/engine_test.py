@@ -9,7 +9,7 @@ def test_cEngine():
     ef.EngineFactory.engineclass = engine.Engine
     col = [e.Column(i) for i in range(10)]
     q = (col[1]=="hoge") & (col[2]=="fuga") & (col[4]=="poyo") | (col[2]=="hogera") & (col[5]=="piyo")
-    eng = q.compile(list(range(len(col))))
+    eng = ef.compile_query(q, list(range(len(col))))
     assert isinstance(eng, engine.Engine)
     assert eng
     assert eng.fail == 2
@@ -27,7 +27,7 @@ def test_cEngine():
 
     col = [e.Column(i) for i in range(10)]
     q = (col[1]=="hoge") & (col[2]=="fuga") & (col[4]=="poyo") | (col[2]=="hogera") & (col[5]=="piyo")
-    eng = q.compile(list(range(len(col))))
+    eng = ef.compile_query(q, list(range(len(col))))
     assert eng
     for colid, c in enumerate(['aa', 'hoge', 'fuga', 'bbb', 'poyo', 'fa']):
         eng.transition(colid, c)
@@ -68,7 +68,7 @@ def test_csv():
     ef.EngineFactory.engineclass = engine.Engine
     col = [e.Column(i) for i in range(10)]
     q = (col[1]=="hoge") & (col[2]=="fuga") & (col[4]=="poyo") | (col[2]=="hogera") & (col[5]=="piyo")
-    eng = q.compile(list(range(len(col))))
+    eng = ef.compile_query(q, list(range(len(col))))
     parser = engine.CSVParser(eng, fileobj)
     assert parser
     res = list(parser)

@@ -1,7 +1,5 @@
 #define MODULE_VERSION "0.0.1"
 
-#define STR_EQ 1
-
 #include <Python.h>
 #include <structmember.h>
 
@@ -38,9 +36,23 @@ static char *engine_kws[] = {
     NULL
 };
 
-static int op2int(const char *op){
+static Operator read_op(const char *op){
     if(strcmp(op, "=")==0)
         return STR_EQ;
+    else if(strcmp(op, "!=")==0)
+        return STR_NE;
+    else if(strcmp(op, "<")==0)
+        return STR_LT;
+    else if(strcmp(op, "<=")==0)
+        return STR_LE;
+    else if(strcmp(op, ">")==0)
+        return STR_GT;
+    else if(strcmp(op, ">=")==0)
+        return STR_GE;
+    else if(strcmp(op, "in")==0)
+        return STR_IN;
+    else
+        return NOP;
 
     return 0;
 }
@@ -75,7 +87,7 @@ construct_expr(Expr *exprs, PyObject *pyexpr)
         return 0;
 
     strcpy(arg, py_arg);
-    expr.op = op2int(py_op);
+    expr.op = read_op(py_op);
     expr.arg = arg;
     *exprs = expr;
     return 1;
@@ -154,14 +166,32 @@ Engine_init(Engine *self, PyObject *args, PyObject *kwargs)
     return 0;
 }
 
-static int execute_expr(Expr *expr, const char *val)
+static int
+execute_expr(Expr *expr, const char *val)
 {
     switch(expr->op){
+    case NOP:
+        break;
     case STR_EQ:
-        if(strcmp(expr->arg, val) == 0){
-            return 1;
-        }else
-            return 0;
+        return (strcmp(val, expr->arg) == 0);
+        break;
+    case STR_NE:
+        return (strcmp(val, expr->arg) != 0);
+        break;
+    case STR_LT:
+        return (strcmp(val, expr->arg) < 0);
+        break;
+    case STR_LE:
+        return (strcmp(val, expr->arg) <= 0);
+        break;
+    case STR_GT:
+        return (strcmp(val, expr->arg) > 0);
+        break;
+    case STR_GE:
+        return (strcmp(val, expr->arg) >= 0);
+        break;
+    case STR_IN:
+        return strstr(val, expr->arg)!=NULL;
         break;
     }
     return 0;

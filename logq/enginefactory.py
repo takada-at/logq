@@ -1,5 +1,10 @@
 # -*- coding: utf-8 -*-
 from __future__ import division, print_function, absolute_import
+from .engine import Engine
+
+def compile_query(expr, cols):
+    factory = EngineFactory()
+    return factory.compile_query(expr, cols)
 
 class PyEngine(object):
     def __init__(self, start, success, fail, exprs, expr_table, success_table, fail_table):
@@ -110,7 +115,14 @@ class PosList():
             self._state += 1
 
 class EngineFactory():
-    engineclass = PyEngine
+    engineclass = Engine
+    @classmethod
+    def set_engineclass(cls, class_):
+        cls.engineclass = class_
+    def compile_query(self, expr, cols):
+        expr = expr.minimalize()
+        opcodes = expr._construct()
+        return self.construct(opcodes, cols=cols)
     def dict2table(self, poslist, cols, dic):
         res = []
         last = poslist.state(poslist[-1])

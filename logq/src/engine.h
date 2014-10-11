@@ -3,8 +3,12 @@
 
 extern PyTypeObject Engine_Type;
 
+typedef enum {
+    NOP, STR_EQ, STR_NE, STR_LT, STR_LE, STR_GT, STR_GE, STR_IN
+} Operator;
+
 typedef struct {
-    int op;
+    Operator op;
     char *arg;
 } Expr;
 
@@ -29,4 +33,5 @@ typedef struct {
 int Engine_read(Engine *self, int col, const char* val);
 
 PyObject* Engine_reset(Engine *self);
+
 #endif

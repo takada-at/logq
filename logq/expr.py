@@ -3,7 +3,6 @@ from __future__ import division, print_function, absolute_import
 from collections import Counter, defaultdict
 from itertools import combinations
 from .logic import Atomic, Bool, And, Or, Not, QuineMcCluskey
-from .enginefactory import EngineFactory
 
 class OpCodes(object):
     def __init__(self):
@@ -42,14 +41,11 @@ class Expr(Bool):
         return qOr(self, other)
     def __invert__(self):
         return qNot(self)
-    def compile(self, cols):
+    def minimalize(self):
         expr = self.normalize()
         obj = QuineMcCluskey(expr)
         expr = obj.compute()
-        opcodes = expr._construct()
-        factory = EngineFactory()
-        engine  = factory.construct(opcodes, cols=cols)
-        return engine
+        return expr
 
 class qAtomic(Expr, Atomic):
     def _construct(self):
@@ -61,13 +57,23 @@ class Column(object):
     def __init__(self, name):
         self.colname = name
     def __eq__(self, other):
-        return StringEq(self.colname, other)
+        return BinOp('=',  self.colname, other)
+    def __ne__(self, other):
+        return BinOp('!=', self.colname, other)
+    def __lt__(self, other):
+        return BinOp('<',  self.colname, other)
+    def __le__(self, other):
+        return BinOp('<=', self.colname, other)
+    def __gt__(self, other):
+        return BinOp('>',  self.colname, other)
+    def __ge__(self, other):
+        return BinOp('>=', self.colname, other)
 
-class StringEq(qAtomic):
-    def __init__(self, colname, queryword):
+class BinOp(qAtomic):
+    def __init__(self, op, colname, queryword):
         self.name = "col_{} = '{}'".format(colname, queryword)
         self.colname = colname
-        self.ops = ('=', queryword)
+        self.ops = (op, queryword)
         self.args = set([self])
 
 class qNot(Expr, Not):
@@ -77,6 +83,8 @@ class qNot(Expr, Not):
     def invert(self, op):
         if op=='=':
             return '!='
+        elif op=='!=':
+            return '='
         elif op=='>':
             return '<='
         elif op=='<':

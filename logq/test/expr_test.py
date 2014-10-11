@@ -5,7 +5,7 @@ from .. import expr as e
 def test_Engine():
     col = [e.Column(i) for i in range(10)]
     s = col[1]=="hoge"
-    assert isinstance(s, e.StringEq)
+    assert isinstance(s, e.BinOp)
     assert isinstance(s|s, e.qOr)
     q = (col[1]=="hoge") & (col[2]=="fuga") & (col[4]=="poyo") | (col[2]=="hogera") & (col[5]=="piyo")
     col = [e.Column(i) for i in range(10)]
