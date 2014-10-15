@@ -16,15 +16,11 @@ class PyEngine(object):
         self.fail_table = fail_table
         self.exprs = exprs
         self.cols = list(range(len(self.expr_table[0])))
-        self.state = start
+        self.reset()
     def reset(self):
         self.state = self.start
-    @property
-    def is_success(self):
-        return self.state==self.success
-    @property
-    def is_fail(self):
-        return self.state==self.fail
+        self.is_success = False
+        self.is_fail = False
     def format_op(self, op):
         return " {}{}".format(*op)
     def format(self):
@@ -62,8 +58,10 @@ class PyEngine(object):
                 res = self.execute_op(op, arg, val)
                 if res:
                     self.state = self.success_table[self.state][col]
+                    self.is_success = self.state == self.success
                 else:
                     self.state = self.fail_table[self.state][col]
+                    self.is_fail = self.state == self.fail
             else:
                 return None
 
@@ -179,7 +177,6 @@ class EngineFactory():
         exprs = [None]+[k for k, v in exprs]
         success_table = self.dict2table(poslist, cols, self.success_table)
         fail_table = self.dict2table(poslist, cols, self. fail_table)
-        print(start, success, fail, exprs, expr_table, success_table, fail_table)
         klass = self.engineclass
         return klass(start, success, fail, exprs, expr_table, success_table, fail_table)
     def _construct_poslist(self, table, cols, poslist):
@@ -190,7 +187,6 @@ class EngineFactory():
                 for rowid, row in enumerate(table):
                     if ((rowstate >> rowid) & 1)==0: continue
                     if col not in row: continue
-                    flag = True
                     exprs = row[col]
                     for oppos, ops in enumerate(exprs):
                         opid = self.opids[ops]

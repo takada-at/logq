@@ -244,11 +244,9 @@ CSVParser_new(PyTypeObject *type, PyObject *args, PyObject *kwargs)
 {
     Engine *engine;
     PyObject *pyfile  = NULL;
-    FILE *file = NULL;
     char delimiter = ',';
     char quotechar = '"';
     CSVParser * self = PyObject_GC_New(CSVParser, &CSVParser_Type);
-
     if (self == NULL){
         return NULL;
     }
@@ -260,15 +258,17 @@ CSVParser_new(PyTypeObject *type, PyObject *args, PyObject *kwargs)
                                      &delimiter, &quotechar)){
         return NULL;
     }
-    if(!PyFile_Check(pyfile)){
-        return NULL;
+    if(PyFile_Check(pyfile)){
+        self->file   = PyFile_AsFile(pyfile);
+        self->is_file = 1;
+    }else{
+        self->file   = NULL;
+        self->is_file = 0;
     }
-    file = PyFile_AsFile(pyfile);
     Py_INCREF(pyfile);
     Py_INCREF(engine);
     self->engine = engine;
-    self->pyfile = (PyFileObject *)pyfile;
-    self->file   = file;
+    self->pyfile = pyfile;
     self->fields = NULL;
     self->field  = NULL;
     self->field_size = 0;
@@ -286,9 +286,67 @@ CSVParser_new(PyTypeObject *type, PyObject *args, PyObject *kwargs)
 }
 
 static PyObject *
+CSVParser_iternext_filelike(CSVParser *self)
+{
+    char *buf;
+    char c;
+    PyObject *fields = NULL;
+    PyObject *lineobj = NULL;
+    long i;
+    long linelen;
+    Engine_reset(self->engine);
+    while(!self->engine->is_success){
+        if (parse_reset(self) < 0)
+            return NULL;
+        do {
+            lineobj = PyIter_Next(self->pyfile);
+            if (lineobj == NULL) {
+                /* End of input OR exception */
+                if (!PyErr_Occurred() && (self->field_len != 0 ||
+                                          self->state == IN_QUOTED_FIELD)) {
+                    if (parse_save_field(self) >= 0 )
+                        break;
+                }
+                return NULL;
+            }
+            ++self->line_num;
+
+            buf = PyString_AsString(lineobj);
+            linelen = PyString_Size(lineobj);
+
+            if (buf == NULL || linelen < 0) {
+                return NULL;
+            }
+            for(i=0; i<linelen; ++i){
+                c = buf[i];
+                if (c == '\0') {
+                    Py_DECREF(lineobj);
+                    PyErr_Format(csv_error_obj,
+                                 "line contains NULL byte");
+                    goto err;
+                }
+                if (parse_process_char(self, c) < 0) {
+                    Py_DECREF(lineobj);
+                    goto err;
+                }
+            }
+            Py_DECREF(lineobj);
+            if (parse_process_char(self, 0) < 0)
+                goto err;
+        } while (self->state != START_RECORD);
+    }
+    fields = self->fields;
+    self->fields = NULL;
+err:
+    return fields;
+}
+
+#define MAXBUFSIZE 300
+static PyObject *
 CSVParser_iternext(CSVParser *self)
 {
-#define MAXBUFSIZE 300
+    if(!self->is_file)
+        return CSVParser_iternext_filelike(self);
     char buf[MAXBUFSIZE];
     char c;
     char *cp;
@@ -300,11 +358,11 @@ CSVParser_iternext(CSVParser *self)
         if (parse_reset(self) < 0)
             return NULL;
         do {
-            PyFile_IncUseCount(self->pyfile);
+            PyFile_IncUseCount((PyFileObject*)self->pyfile);
             Py_BEGIN_ALLOW_THREADS
             cp = fgets(buf, MAXBUFSIZE, self->file);
             Py_END_ALLOW_THREADS
-            PyFile_DecUseCount(self->pyfile);
+            PyFile_DecUseCount((PyFileObject*)self->pyfile);
             if (cp == NULL) {
                 /* End of input OR exception */
                 if (!PyErr_Occurred() && (self->field_len != 0 ||

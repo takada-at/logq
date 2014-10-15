@@ -1,7 +1,5 @@
 # -*- coding: utf-8 -*-
 from __future__ import division, print_function, absolute_import
-from collections import Counter, defaultdict
-from itertools import combinations
 from .logic import Atomic, Bool, And, Or, Not, QuineMcCluskey
 
 class OpCodes(object):
@@ -14,7 +12,7 @@ class OpCodes(object):
         d[colname].append(ops)
         self.ops.add(ops)
     def __iter__(self):
-        for i, row in enumerate(self, opcodes):
+        for i, row in enumerate(self.table):
             for col, ops in row.items():
                 for op in ops:
                     yield i, col, op
@@ -96,7 +94,7 @@ class qNot(Expr, Not):
     def _construct(self):
         child = self.child
         eng0 = OpCodes()
-        eng1 = child._construct(factory)
+        eng1 = child._construct()
         for colname, opcodes in eng1.current():
             for ops in opcodes:
                 nops = (self.invert(ops[0]), ops[1])

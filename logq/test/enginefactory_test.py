@@ -6,7 +6,7 @@ from .. import expr as e
 def test_EngineFactory():
     reload(ef)
     fac = ef.EngineFactory()
-    ef.EngineFactory.engineclass = ef.PyEngine
+    ef.EngineFactory.set_engineclass(ef.PyEngine)
     col = [e.Column(i) for i in range(10)]
     q = (col[1]=="hoge") & (col[2]=="fuga") & (col[4]=="poyo") | (col[2]=="hogera") & (col[5]=="piyo")
     q.normalize()
@@ -45,8 +45,7 @@ def test_EngineFactory():
 
 def test_Engine():
     reload(ef)
-    ef.EngineFactory.engineclass = ef.PyEngine
-    fac = ef.EngineFactory()
+    ef.EngineFactory.set_engineclass(ef.PyEngine)
     col = [e.Column(i) for i in range(10)]
     q = (col[1]=="hoge") & (col[2]=="fuga") & (col[4]=="poyo") | (col[2]=="hogera") & (col[5]=="piyo")
     eng = ef.compile_query(q, list(range(len(col))))

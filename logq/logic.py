@@ -154,7 +154,7 @@ class And(BinaryTerm):
         a
         >>> ((a|b) & a).normalize()
         a
-        >>> ((a|b) & b) & c).normalize()
+        >>> (((a|b) & b) & c).normalize()
         a & b & c | b & c
         """
         if self._mark: return self
