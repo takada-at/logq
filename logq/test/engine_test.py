@@ -8,16 +8,15 @@ def test_cEngine():
     ef.EngineFactory.engineclass = engine.Engine
     col = [e.Column(i) for i in range(10)]
     q = (col[1]=="hoge") & (col[2]=="fuga") & (col[4]=="poyo") | (col[2]=="hogera") & (col[5]=="piyo")
-    eng = ef.compile_query(q, list(range(len(col))))
+    eng = ef.compile_query(q)
     assert isinstance(eng, engine.Engine)
     assert eng
     assert eng.fail == 2
+    colids = {colname: cid for cid, colname in enumerate((1,2,4,5))}
     for colid, c in enumerate(['aa', 'hoge', 'fuga', 'bbb', 'poyo', 'fa']):
         s = True;
-        while s:
-            print("f")
-            s = eng.transition(colid, c)
-            print("hoge")
+        if colid in colids:
+            s = eng.transition(colids[colid], c)
 
         if eng.is_success: break
 
@@ -26,24 +25,28 @@ def test_cEngine():
 
     col = [e.Column(i) for i in range(10)]
     q = (col[1]=="hoge") & (col[2]=="fuga") & (col[4]=="poyo") | (col[2]=="hogera") & (col[5]=="piyo")
-    eng = ef.compile_query(q, list(range(len(col))))
+    colids = {colname: cid for cid, colname in enumerate((1,2,4,5))}
+    eng = ef.compile_query(q)
     assert eng
     for colid, c in enumerate(['aa', 'hoge', 'fuga', 'bbb', 'poyo', 'fa']):
-        eng.transition(colid, c)
+        if colid in colids:
+            eng.transition(colids[colid], c)
         if eng.is_success: break
 
     assert eng.is_success
 
     eng.reset()
     for colid, c in enumerate(['aa', 'hoge', 'hogera', 'bbb', 'poyo', 'piyo']):
-        eng.transition(colid, c)
+        if colid in colids:
+            eng.transition(colids[colid], c)
         if eng.is_success: break
 
     assert eng.is_success
 
     eng.reset()
     for colid, c in enumerate(['aa', 'hoge', 'hogera', 'bbb', 'poyo', 'uuu']):
-        eng.transition(colid, c)
+        if colid in colids:
+            eng.transition(colids[colid], c)
         if eng.is_success: break
         if eng.is_fail: break
 
