@@ -20,6 +20,7 @@ typedef struct {
     int fail;
     int state;
     int is_success;
+    int is_file;
     int is_fail;
     int colsize;
     int statesize;

@@ -33,6 +33,12 @@ class OpCodes(object):
         self.table[-1] = row
 
 class Expr(Bool):
+    def collumns(self):
+        variables = self.variables
+        colnames = list({v.colname for v in variables})
+        colnames.sort()
+        colids = [(colname, colid) for colid, colname in enumerate(colnames)]
+        return colids
     def __and__(self, other):
         return qAnd(self, other)
     def __or__(self, other):

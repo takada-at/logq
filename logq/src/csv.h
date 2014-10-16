@@ -1,6 +1,8 @@
 #ifndef CSV_H
 #define CSV_H
 
+#include "colmap.h"
+
 typedef enum {
     START_RECORD, START_FIELD, IN_FIELD,
     IN_QUOTED_FIELD, QUOTE_IN_QUOTED_FIELD,
@@ -11,6 +13,7 @@ typedef struct {
     PyObject_HEAD
 
     Engine *engine;
+    ColMap *colmap;
     PyObject *pyfile;
     FILE *file;
     PyObject *fields;           /* field list for current record */

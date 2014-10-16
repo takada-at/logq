@@ -3,6 +3,7 @@
 
 #include "engine.h"
 #include "csv.h"
+#include "colmap.h"
 
 /**
  * CSVParser
@@ -16,10 +17,12 @@ staticforward PyTypeObject CSVParser_Type;
 
 #define CSVParser_Check(v)   (Py_TYPE(v) == &CSVParser_Type)
 
+char colname[10];
 static int
 parse_save_field(CSVParser *self)
 {
     const char *string;
+    int colid;
     PyObject *field;
     field = PyString_FromStringAndSize(self->field, self->field_len);
     if (field == NULL)
@@ -27,7 +30,11 @@ parse_save_field(CSVParser *self)
 
     if(!self->engine->is_success){
         string = PyString_AS_STRING(field);
-        Engine_read(self->engine, self->col, string);
+        sprintf(colname, "%d", self->col);
+        colid = ColMap_get(self->colmap, colname);
+        if(colid>=0){
+            Engine_read(self->engine, colid, string);
+        }
     }
     self->field_len = 0;
     PyList_Append(self->fields, field);
@@ -234,6 +241,7 @@ parse_reset(CSVParser *self)
 static char *parser_kws[] = {
     "engine",
     "file",
+    "colmap",
     "delimiter",
     "quotechar",
     NULL
@@ -244,6 +252,8 @@ CSVParser_new(PyTypeObject *type, PyObject *args, PyObject *kwargs)
 {
     Engine *engine;
     PyObject *pyfile  = NULL;
+    PyObject *map = NULL;
+    ColMap *colmap = NULL;
     char delimiter = ',';
     char quotechar = '"';
     CSVParser * self = PyObject_GC_New(CSVParser, &CSVParser_Type);
@@ -252,23 +262,38 @@ CSVParser_new(PyTypeObject *type, PyObject *args, PyObject *kwargs)
     }
 
     if (!PyArg_ParseTupleAndKeywords(args, kwargs,
-                                     "O!O|cc", parser_kws,
+                                     "O!OO|cc", parser_kws,
                                      &Engine_Type, &engine,
                                      &pyfile,
+                                     &map,
                                      &delimiter, &quotechar)){
+        Py_DECREF(self);
         return NULL;
-    }
-    if(PyFile_Check(pyfile)){
-        self->file   = PyFile_AsFile(pyfile);
-        self->is_file = 1;
-    }else{
-        self->file   = NULL;
-        self->is_file = 0;
     }
     Py_INCREF(pyfile);
     Py_INCREF(engine);
     self->engine = engine;
-    self->pyfile = pyfile;
+    if(PyFile_Check(pyfile)){
+        self->file   = PyFile_AsFile(pyfile);
+        self->is_file = 1;
+        self->pyfile = pyfile;
+    }else{
+        self->file    = NULL;
+        self->is_file = 0;
+        self->pyfile  = PyObject_GetIter(pyfile);
+        if (self->pyfile == NULL) {
+            PyErr_SetString(PyExc_TypeError,
+                            "argument 1 must be an iterator");
+            return NULL;
+        }
+    }
+    colmap = ColMap_new(map);
+    if (colmap == NULL) {
+        PyErr_SetString(PyExc_TypeError,
+                        "argument 2 must be an dict");
+        return NULL;
+    }
+    self->colmap = colmap;
     self->fields = NULL;
     self->field  = NULL;
     self->field_size = 0;
@@ -408,6 +433,7 @@ CSVParser_dealloc(CSVParser *self)
     if (self->field != NULL)
         PyMem_Free(self->field);
 
+    ColMap_dealloc(self->colmap);
     PyObject_GC_Del(self);
 }
 
