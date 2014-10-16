@@ -51,6 +51,8 @@ static Operator read_op(const char *op){
         return STR_GE;
     else if(strcmp(op, "in")==0)
         return STR_IN;
+    else if(strcmp(op, "nin")==0)
+        return STR_NIN;
     else
         return NOP;
 
@@ -192,6 +194,9 @@ execute_expr(Expr *expr, const char *val)
         break;
     case STR_IN:
         return strstr(val, expr->arg)!=NULL;
+        break;
+    case STR_NIN:
+        return strstr(val, expr->arg)==NULL;
         break;
     }
     return 0;

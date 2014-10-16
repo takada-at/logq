@@ -139,7 +139,7 @@ class EngineFactory():
         cls.engineclass = class_
     def compile_query(self, expr):
         expr = expr.minimalize()
-        colids = expr.collumns()
+        colids = expr.columns()
         opcodes = expr._construct()
         return self.construct(opcodes, colids)
     def dict2table(self, poslist, colids, dic):

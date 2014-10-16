@@ -4,7 +4,7 @@
 extern PyTypeObject Engine_Type;
 
 typedef enum {
-    NOP, STR_EQ, STR_NE, STR_LT, STR_LE, STR_GT, STR_GE, STR_IN
+    NOP, STR_EQ, STR_NE, STR_LT, STR_LE, STR_GT, STR_GE, STR_IN, STR_NIN
 } Operator;
 
 typedef struct {

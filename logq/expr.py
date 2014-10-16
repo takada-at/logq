@@ -33,7 +33,7 @@ class OpCodes(object):
         self.table[-1] = row
 
 class Expr(Bool):
-    def collumns(self):
+    def columns(self):
         variables = self.variables
         colnames = list({v.colname for v in variables})
         colnames.sort()
@@ -60,6 +60,8 @@ class qAtomic(Expr, Atomic):
 class Column(object):
     def __init__(self, name):
         self.colname = name
+    def contains(self, other):
+        return BinOp('in',  self.colname, other)
     def __eq__(self, other):
         return BinOp('=',  self.colname, other)
     def __ne__(self, other):
@@ -97,6 +99,10 @@ class qNot(Expr, Not):
             return '>'
         elif op=='>=':
             return '<'
+        elif op=='in':
+            return 'nin'
+        elif op=='nin':
+            return 'in'
     def _construct(self):
         child = self.child
         eng0 = OpCodes()
