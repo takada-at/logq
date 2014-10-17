@@ -263,7 +263,11 @@ class QuineMcCluskey(object):
             return res
 
         variables = self.variables
-        disjuncts = self.term.children()
+        if isinstance(self.term, Or):
+            disjuncts = self.term.children()
+        else:
+            disjuncts = [self.term]
+
         newdisjuncts = []
         for disjunct in disjuncts:
             L = [disjunct.children()]

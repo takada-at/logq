@@ -19,3 +19,11 @@ def testCSVFile():
     logfile = CSVFile(tmp)
     r = logfile.search(q)
     assert 3==len(list(r))
+
+    q = (col[2] >= "hoge") & (col[0]=='a')
+    print(q)
+    logfile = CSVFile(tmp)
+    r = logfile.search(q)
+    assert 2==len(list(r))
+
+

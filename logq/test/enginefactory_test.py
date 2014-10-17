@@ -12,7 +12,6 @@ def test_EngineFactory():
     eng = ef.compile_query(q)
     colids = {colname: cid for cid, colname in enumerate((1,2,4,5))}
     assert eng
-    print('')
     print(eng.format())
     state = 0
     col = colids[1]
@@ -82,7 +81,6 @@ def test_Engine():
         if eng.is_fail: break
 
     assert eng.is_fail
-    print("hoge")
 
 def test_EngineFactory2():
     reload(ef)
@@ -93,6 +91,17 @@ def test_EngineFactory2():
     eng = ef.compile_query(q)
     colids = {colname: cid for cid, colname in enumerate((1,2,4,5))}
     assert eng
-    print('')
     print(eng.format())
+
+def test_EngineFactory3():
+    reload(ef)
+    fac = ef.EngineFactory()
+    ef.EngineFactory.set_engineclass(ef.PyEngine)
+    col = [e.Column(i) for i in range(10)]
+    q = (col[2] >= "hoge") & (col[0]=='a') & (col[2]<='hoge')
+    eng = ef.compile_query(q)
+    assert eng
+    print(eng.format())
+    assert eng.success_table[0][0]!=1
+
 

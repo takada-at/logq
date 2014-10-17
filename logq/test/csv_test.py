@@ -121,3 +121,15 @@ def test_csv3():
     parser = engine.CSVParser(eng, io.BytesIO(b''), colmap)
     parser = engine.CSVParser(eng, io.BytesIO(b'\n'), colmap)
     parser = engine.CSVParser(eng, io.BytesIO(b'abc\n'), colmap)
+
+    s = "a" * 299 + ",bcd"
+    tmp = tempfile.NamedTemporaryFile()
+    tmp.write(s)
+    fileobj = tmp.file
+    fileobj.seek(0)
+
+    q = e.Column(1)=='bcd'
+    eng = ef.compile_query(q)
+    colmap = {str(k): v for k, v in q.columns()}
+    parser = engine.CSVParser(eng, fileobj, colmap)
+    assert 1==len(list(parser))

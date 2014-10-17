@@ -160,4 +160,9 @@ def test_compute():
 
     obj = qm.QuineMcCluskey(a)
     z2 = obj.compute()
-    z2 == a
+    assert z2 == a
+
+    q = a & b & c
+    obj = qm.QuineMcCluskey(q)
+    z2 = obj.compute()
+    assert z2 == q

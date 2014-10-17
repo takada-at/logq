@@ -79,7 +79,7 @@ class Column(object):
 
 class BinOp(qAtomic):
     def __init__(self, op, colname, queryword):
-        self.name = "col_{} = '{}'".format(colname, queryword)
+        self.name = "col_{} {} '{}'".format(colname, op, queryword)
         self.colname = colname
         self.ops = (op, queryword)
         self.args = set([self])

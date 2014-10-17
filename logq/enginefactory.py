@@ -85,9 +85,9 @@ class PosList():
         """
         rowstate = pos[0]
         rowid = pos[1]
-        for pos in self[idx+1:]:
-            if pos[0]==rowstate and pos[1]==rowid:
-                return pos
+        for npos in self[idx+1:]:
+            if npos[0]==rowstate and npos[1]==rowid:
+                return npos
 
         return None
     def successstate(self, pos):
@@ -193,7 +193,10 @@ class EngineFactory():
                 self.success_table[state] = success
             else:
                 npos = poslist.successstate(pos)
-                self.success_table[state] = poslist.state(npos)
+                if npos:
+                    self.success_table[state] = poslist.state(npos)
+                else:
+                    self.success_table[state] = success
 
         expr_table = self.dict2table(poslist, colids, self.expr_table)
         exprs = self.opids.items()
@@ -204,7 +207,7 @@ class EngineFactory():
         klass = self.engineclass
         return klass(start, success, fail, exprs, expr_table, success_table, fail_table)
     def _construct_poslist(self, table, colids, poslist):
-        rowstates = range(1, 2**len(table))
+        rowstates = range(0, 2**len(table)+1)
         rowstates.reverse()
         for rowstate in rowstates:
             for colname, colid in colids:
