@@ -370,7 +370,7 @@ err:
     return fields;
 }
 
-#define MAXBUFSIZE 300
+#define MAXBUFSIZE 30000
 static PyObject *
 CSVParser_iternext(CSVParser *self)
 {
