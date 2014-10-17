@@ -97,3 +97,27 @@ def test_csv3():
     parser = engine.CSVParser(eng, fileobj, colmap, delimiter=b"\t")
     assert 3==len(list(parser))
 
+
+    line = 'hoge,hoge,hoge,hoge,hoge,hoge,hoge,hoge,hoge,hoge,hoge,hoge,hoge,hoge,hoge,hoge,hoge,hoge,hoge,hoge,hoge,hoge,hoge,hoge,hoge,hoge,hoge,hoge,hoge,hoge,hoge,hoge,hoge,hoge,hoge,hoge,hoge,hoge,hoge,hoge,hoge,hoge,hoge,hoge,hoge,hoge,hoge,hoge,hoge,hoge,fuga'
+    tmp = tempfile.NamedTemporaryFile()
+    tmp.write(line)
+    fileobj = tmp.file
+
+    fileobj.seek(0)
+    q = e.Column(0)=='hoge'
+    eng = ef.compile_query(q)
+    colmap = {str(k): v for k, v in q.columns()}
+    parser = engine.CSVParser(eng, fileobj, colmap)
+    assert 1==len(list(parser))
+
+    fileobj.seek(0)
+    q = e.Column(50)=="fuga"
+    eng = ef.compile_query(q)
+    colmap = {str(k): v for k, v in q.columns()}
+    parser = engine.CSVParser(eng, fileobj, colmap)
+    assert 1==len(list(parser))
+
+    import io
+    parser = engine.CSVParser(eng, io.BytesIO(b''), colmap)
+    parser = engine.CSVParser(eng, io.BytesIO(b'\n'), colmap)
+    parser = engine.CSVParser(eng, io.BytesIO(b'abc\n'), colmap)

@@ -198,6 +198,12 @@ execute_expr(Expr *expr, const char *val)
     case STR_NIN:
         return strstr(val, expr->arg)==NULL;
         break;
+    case TOP:
+        return 1;
+        break;
+    case BTM:
+        return 0;
+        break;
     }
     return 0;
 }

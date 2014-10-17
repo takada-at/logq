@@ -62,6 +62,8 @@ class Column(object):
         self.colname = name
     def contains(self, other):
         return BinOp('in',  self.colname, other)
+    def notcontains(self, other):
+        return BinOp('nin',  self.colname, other)
     def __eq__(self, other):
         return BinOp('=',  self.colname, other)
     def __ne__(self, other):

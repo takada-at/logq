@@ -99,11 +99,14 @@ parse_process_char(CSVParser *self, char c)
         /* fallthru */
     case START_FIELD:
         /* expecting field */
-        if (c == '\n' || c == '\r' || c == '\0') {
+        if (c == '\n' || c == '\r') {
             /* save empty field - return [fields] */
             if (parse_save_field(self) < 0)
                 return -1;
-            self->state = (c == '\0' ? START_RECORD : EAT_CRNL);
+            self->state = EAT_CRNL;
+        }
+        else if (c == '\0'){
+            break;
         }
         else if (c == self->quotechar) {
             /* start quoted field */
@@ -131,7 +134,7 @@ parse_process_char(CSVParser *self, char c)
             self->state = EAT_CRNL;
         }
         else if(c == '\0') {
-            //go next
+            //go next line
         }
         else if (c == self->delimiter) {
             /* save field - wait for new field */
@@ -479,7 +482,7 @@ static struct PyMemberDef CSVParser_memberlist[] = {
 
 static PyTypeObject CSVParser_Type = {
     PyVarObject_HEAD_INIT(NULL, 0)
-    "_csv.reader",                          /*tp_name*/
+    "engine.CSVParser",                     /*tp_name*/
     sizeof(CSVParser),                      /*tp_basicsize*/
     0,                                      /*tp_itemsize*/
     /* methods */
