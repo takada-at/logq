@@ -157,3 +157,7 @@ def test_compute():
     obj = qm.QuineMcCluskey(z)
     z2 = obj.compute()
     assert z2 == c & d | a & b & ~c 
+
+    obj = qm.QuineMcCluskey(a)
+    z2 = obj.compute()
+    z2 == a

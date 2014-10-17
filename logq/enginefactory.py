@@ -134,6 +134,9 @@ class PosList():
 
 class EngineFactory():
     engineclass = Engine
+    START = 0
+    SUCCESS = 1
+    FAIL = 2
     @classmethod
     def set_engineclass(cls, class_):
         cls.engineclass = class_
@@ -144,7 +147,7 @@ class EngineFactory():
         return self.construct(opcodes, colids)
     def dict2table(self, poslist, colids, dic):
         res = []
-        last = poslist.state(poslist[-1])
+        last = max(poslist.state(poslist[-1]), self.FAIL)
         for i in range(last+1):
             res.append([0 for col in colids])
 
@@ -165,9 +168,9 @@ class EngineFactory():
                 self.opids[op] = cnt
                 cnt += 1
 
-        start = 0
-        success = 1
-        fail = 2
+        start = self.START
+        success = self.SUCCESS
+        fail = self.FAIL
         poslist = PosList(0, excludes={1,2})
         self._construct_poslist(opcodes.table, colids, poslist)
         for idx, pos in enumerate(poslist):

@@ -65,3 +65,35 @@ def test_csv2():
     res = list(parser)
     assert 4==len(res)
     assert [['a', 'b', 'hogera', '1', '2', 'piyo'], ['1', 'hoge', 'fuga', '4', 'poyo', '6'], ['a', 'b', 'hogera', '1', '2', 'piyo']] == res[:3]
+
+
+def test_csv3():
+    tmp = tempfile.NamedTemporaryFile()
+    tmp.write("1\t2\t3\t4\t5\t6\n"\
+              "a\tb\thogera\t1\t2\tpiyo\n"\
+              "1\t2\t3\t4\t5\t6\n"\
+              "1\t2\t\"3\t4\"\t5\t6\n"\
+              "1\thoge\tfuga\t4\tpoyo\t6\n"\
+              "a\tb\thogera\t1\t2\tpiyo\n"\
+    )
+    tmp.write('a\tfasfafafab\thogera\t"1\nabc"\t"b""abc"\tpiyo\n')
+    fileobj = tmp.file
+    fileobj.seek(0)
+    ef.EngineFactory.engineclass = engine.Engine
+    col = [e.Column(i) for i in range(10)]
+    q = (col[1]=="hoge") & (col[2]=="fuga") & (col[4]=="poyo") | (col[2]=="hogera") & (col[5]=="piyo")
+    eng = ef.compile_query(q)
+    colmap = {str(k): v for k, v in q.columns()}
+    print(colmap)
+    parser = engine.CSVParser(eng, fileobj, colmap, delimiter=b"\t")
+    assert parser
+    res = list(parser)
+    assert 4==len(res)
+
+    q = col[0]=="a"
+    fileobj.seek(0)
+    eng = ef.compile_query(q)
+    colmap = {str(k): v for k, v in q.columns()}
+    parser = engine.CSVParser(eng, fileobj, colmap, delimiter=b"\t")
+    assert 3==len(list(parser))
+

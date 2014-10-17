@@ -124,11 +124,14 @@ parse_process_char(CSVParser *self, char c)
 
     case IN_FIELD:
         /* in unquoted field */
-        if (c == '\n' || c == '\r' || c == '\0') {
+        if (c == '\n' || c == '\r') {
             /* end of line - return [fields] */
             if (parse_save_field(self) < 0)
                 return -1;
-            self->state = (c == '\0' ? START_RECORD : EAT_CRNL);
+            self->state = EAT_CRNL;
+        }
+        else if(c == '\0') {
+            //go next
         }
         else if (c == self->delimiter) {
             /* save field - wait for new field */
@@ -260,14 +263,12 @@ CSVParser_new(PyTypeObject *type, PyObject *args, PyObject *kwargs)
     if (self == NULL){
         return NULL;
     }
-
     if (!PyArg_ParseTupleAndKeywords(args, kwargs,
                                      "O!OO|cc", parser_kws,
                                      &Engine_Type, &engine,
                                      &pyfile,
                                      &map,
                                      &delimiter, &quotechar)){
-        Py_DECREF(self);
         return NULL;
     }
     Py_INCREF(pyfile);

@@ -280,8 +280,7 @@ class QuineMcCluskey(object):
         それ以上マージできなくなるまで最小項をマージしつづける
         """
         trees = [MergeTree({idx}, term) for idx, term in enumerate(minterms)]
-        merged, _ = self._merge(trees)
-        primes = []
+        merged, primes = self._merge(trees)
         while merged:
             merged, marked = self._merge(merged)
             primes += marked

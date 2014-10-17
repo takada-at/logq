@@ -84,3 +84,15 @@ def test_Engine():
     assert eng.is_fail
     print("hoge")
 
+def test_EngineFactory2():
+    reload(ef)
+    fac = ef.EngineFactory()
+    ef.EngineFactory.set_engineclass(ef.PyEngine)
+    col = [e.Column(i) for i in range(10)]
+    q = (col[0]=="a")
+    eng = ef.compile_query(q)
+    colids = {colname: cid for cid, colname in enumerate((1,2,4,5))}
+    assert eng
+    print('')
+    print(eng.format())
+
