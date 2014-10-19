@@ -22,7 +22,7 @@ setup(name='logq',
       packages=find_packages(),
       ext_modules=[
           Extension('logq.engine', 
-                    ['logq/src/engine.c', 'logq/src/colmap.c', 'logq/src/csv.c'])
+                    ['logq/src/engine.c', 'logq/src/colmap.c', 'logq/src/csv.c', 'logq/src/ltsv.c'])
 
       ],
     tests_require=['pytest'],

@@ -1,10 +1,8 @@
 #define MODULE_VERSION "0.0.1"
 
-#include <Python.h>
-#include <structmember.h>
-
 #include "engine.h"
 #include "csv.h"
+#include "ltsv.h"
 
 /**
  * Engine
@@ -356,4 +354,5 @@ initengine(void)
 
     register_engine(module);
     register_csv(module);
+    register_ltsv(module);
 }

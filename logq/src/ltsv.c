@@ -9,6 +9,33 @@
  * LTSVParser
  */
 
+typedef enum {
+    START_RECORD, START_LABEL, IN_LABEL, 
+    IN_FIELD, EAT_CRNL, QUERY_FAIL
+} LParserState;
+
+typedef struct {
+    PyObject_HEAD
+
+    Engine *engine;
+    ColMap *colmap;
+    char **valmap;
+    PyObject *pyfile;
+    FILE *file;
+    PyObject *fields;           /* field list for current record */
+    LParserState state;          /* current CSV parse state */
+    char *field;                /* build current field in here */
+    char *label;                /* build current field in here */
+    int label_len;
+    int field_size;             /* size of allocated buffer */
+    int field_len;              /* length of current field */
+    int val_len;
+    int val_size;
+    int col;
+    int is_file;
+    unsigned long line_num;     /* Source-file line number */
+} LTSVParser;
+
 static PyObject *ltsv_error_obj;     /* LTSV exception */
 static long field_limit = 128 * 1024;   /* max parsed field size */
 
@@ -31,8 +58,9 @@ read_engine(LTSVParser *self)
     int i = 0;
     int len = self->val_size;
     for (i = 0; i < len; i++) {
-        Engine_read(self->engine, i, *self->val_map[i]);
+        Engine_read(self->engine, i, (const char*)self->valmap[i]);
     }
+    return 1;
 }
 
 static int
@@ -41,7 +69,6 @@ parse_save_field(LTSVParser *self)
     const char *colname;
     const char *val;
     int colid;
-    int i;
     PyObject *tuple;
     PyObject *label;
     PyObject *field;
@@ -58,9 +85,9 @@ parse_save_field(LTSVParser *self)
     if(!self->engine->is_success){
         colname = PyString_AS_STRING(label);
         val     = PyString_AS_STRING(field);
-        colid = ColMap_get(self->colmap, colname);
+        colid = ColMap_get(self->colmap, (char*)colname);
         if(colid>=0){
-            self->val_map[colid] = val;
+            self->valmap[colid] = (char*)val;
             ++self->val_len;
             if(self->val_len==self->val_size){
                 read_engine(self);
@@ -184,7 +211,7 @@ parse_process_char(LTSVParser *self, char c)
             if(self->engine->is_fail)
                 self->state = QUERY_FAIL;
             else
-                self->state = START_FIELD;
+                self->state = START_LABEL;
         }
         else {
             /* normal character - save in field */
@@ -231,8 +258,6 @@ static char *parser_kws[] = {
     "engine",
     "file",
     "colmap",
-    "delimiter",
-    "quotechar",
     NULL
 };
 
@@ -314,8 +339,7 @@ LTSVParser_iternext_filelike(LTSVParser *self)
             lineobj = PyIter_Next(self->pyfile);
             if (lineobj == NULL) {
                 /* End of input OR exception */
-                if (!PyErr_Occurred() && (self->field_len != 0 ||
-                                          self->state == IN_QUOTED_FIELD)) {
+                if (!PyErr_Occurred() && (self->field_len != 0)){
                     if (parse_save_field(self) >= 0 )
                         break;
                 }
@@ -377,8 +401,7 @@ LTSVParser_iternext(LTSVParser *self)
             PyFile_DecUseCount((PyFileObject*)self->pyfile);
             if (cp == NULL) {
                 /* End of input OR exception */
-                if (!PyErr_Occurred() && (self->field_len != 0 ||
-                                          self->state == IN_QUOTED_FIELD)) {
+                if (!PyErr_Occurred() && (self->field_len != 0)){
                     if (parse_save_field(self) >= 0 )
                         break;
                 }

@@ -1,6 +1,9 @@
 #ifndef ENGINE_H
 #define ENGINE_H
 
+#include <Python.h>
+#include <structmember.h>
+
 extern PyTypeObject Engine_Type;
 
 typedef enum {
