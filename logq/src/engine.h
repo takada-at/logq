@@ -39,4 +39,6 @@ int Engine_read(Engine *self, int col, const char* val);
 
 PyObject* Engine_reset(Engine *self);
 
+int register_engine(PyObject *module);
+
 #endif

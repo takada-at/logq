@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-from __future__ import division, print_function, absolute_import
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 from .. import enginefactory as ef
 from .. import engine
@@ -8,9 +8,10 @@ import tempfile
 
 def test_ltsv():
     tmp = tempfile.NamedTemporaryFile()
-    tmp.write("one:1,two:2,three:3\n"\
-              "one:hoge,two:fuga,three:hogera\n"\
-              )
+    tmp.write("one:1\ttwo:2\tthree:3\n"\
+              "one:a\ttwo:b\tthree:hogera\n"\
+              "one:1\ttwo:2\tthree:hoge\n"\
+    )
     fileobj = tmp.file
     fileobj.seek(0)
     ef.EngineFactory.engineclass = engine.Engine
@@ -24,3 +25,13 @@ def test_ltsv():
     assert parser
     res = list(parser)
     assert 1==len(res)
+
+
+    q = col('three').contains('hoge')
+    eng = ef.compile_query(q)
+    colmap = {str(k): v for k, v in q.columns()}
+    fileobj.seek(0)
+    parser = engine.LTSVParser(eng, fileobj, colmap)
+    res = list(parser)
+    assert 2==len(res)
+

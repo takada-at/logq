@@ -348,8 +348,13 @@ CSVParser_iternext_filelike(CSVParser *self)
                     Py_DECREF(lineobj);
                     goto err;
                 }
-                if (self->state == QUERY_FAIL)
+                //query fail. go next line
+                if (self->state == QUERY_FAIL){
+                    if(buf[linelen-1]=='\n'){
+                        self->state = START_RECORD;
+                    }
                     break;
+                }
             }
             Py_DECREF(lineobj);
             if (parse_process_char(self, 0) < 0)
@@ -408,8 +413,13 @@ CSVParser_iternext(CSVParser *self)
                 if (parse_process_char(self, c) < 0) {
                     goto err;
                 }
-                if (self->state == QUERY_FAIL)
+                //query fail. go next line
+                if (self->state == QUERY_FAIL){
+                    if(buf[linelen-1]=='\n'){
+                        self->state = START_RECORD;
+                    }
                     break;
+                }
             }
             if (parse_process_char(self, 0) < 0)
                 goto err;

@@ -12,7 +12,7 @@
 typedef enum {
     START_RECORD, START_LABEL, IN_LABEL, 
     IN_FIELD, EAT_CRNL, QUERY_FAIL
-} LParserState;
+} ParserState;
 
 typedef struct {
     PyObject_HEAD
@@ -23,9 +23,10 @@ typedef struct {
     PyObject *pyfile;
     FILE *file;
     PyObject *fields;           /* field list for current record */
-    LParserState state;          /* current CSV parse state */
+    ParserState state;          /* current CSV parse state */
     char *field;                /* build current field in here */
     char *label;                /* build current field in here */
+    int label_size;
     int label_len;
     int field_size;             /* size of allocated buffer */
     int field_len;              /* length of current field */
@@ -44,9 +45,36 @@ staticforward PyTypeObject LTSVParser_Type;
 #define LTSVParser_Check(v)   (Py_TYPE(v) == &LTSVParser_Type)
 
 static int
+parse_grow_label(LTSVParser *self)
+{
+    if (self->label_size == 0) {
+        self->label_size = 4096;
+        if (self->label != NULL)
+            PyMem_Free(self->label);
+        self->label = PyMem_Malloc(self->label_size);
+    }
+    if (self->label_size < self->field_size){
+        if (self->label_size > INT_MAX / 2) {
+            PyErr_NoMemory();
+            return 0;
+        }
+        self->label_size = self->field_size;
+        self->label = PyMem_Realloc(self->label, self->label_size);
+    }
+    if (self->label == NULL) {
+        PyErr_NoMemory();
+        return 0;
+    }
+    return 1;
+}
+
+static int
 parse_save_label(LTSVParser *self)
 {
-    self->label = self->field;
+    if(!parse_grow_label(self))
+        return -1;
+
+    strncpy(self->label, self->field, self->field_len);
     self->label_len = self->field_len;
     self->field_len = 0;
     return 0;
@@ -58,7 +86,7 @@ read_engine(LTSVParser *self)
     int i = 0;
     int len = self->val_size;
     for (i = 0; i < len; i++) {
-        Engine_read(self->engine, i, (const char*)self->valmap[i]);
+        Engine_read(self->engine, i, self->valmap[i]);
     }
     return 1;
 }
@@ -66,8 +94,8 @@ read_engine(LTSVParser *self)
 static int
 parse_save_field(LTSVParser *self)
 {
-    const char *colname;
-    const char *val;
+    char *colname;
+    char *val;
     int colid;
     PyObject *tuple;
     PyObject *label;
@@ -87,7 +115,7 @@ parse_save_field(LTSVParser *self)
         val     = PyString_AS_STRING(field);
         colid = ColMap_get(self->colmap, (char*)colname);
         if(colid>=0){
-            self->valmap[colid] = (char*)val;
+            self->valmap[colid] = val;
             ++self->val_len;
             if(self->val_len==self->val_size){
                 read_engine(self);
@@ -111,7 +139,6 @@ parse_grow_buff(LTSVParser *self)
         if (self->field != NULL)
             PyMem_Free(self->field);
         self->field = PyMem_Malloc(self->field_size);
-        self->label = NULL;
     }
     else {
         if (self->field_size > INT_MAX / 2) {
@@ -165,6 +192,8 @@ parse_process_char(LTSVParser *self, char c)
             /* save empty label */
             if (parse_save_label(self) < 0)
                 return -1;
+
+            self->state = IN_FIELD;
         }
         else if (c == '\t') {
             /* save empty field */
@@ -312,6 +341,7 @@ LTSVParser_new(PyTypeObject *type, PyObject *args, PyObject *kwargs)
     self->field  = NULL;
     self->label  = NULL;
     self->field_size = 0;
+    self->label_size = 0;
     self->line_num   = 0;
     if (parse_reset(self) < 0) {
         Py_DECREF(pyfile);
@@ -365,8 +395,13 @@ LTSVParser_iternext_filelike(LTSVParser *self)
                     Py_DECREF(lineobj);
                     goto err;
                 }
-                if (self->state == QUERY_FAIL)
+                //query fail. go next line
+                if (self->state == QUERY_FAIL){
+                    if(buf[linelen-1]=='\n'){
+                        self->state = EAT_CRNL;
+                    }
                     break;
+                }
             }
             Py_DECREF(lineobj);
         } while (self->state != EAT_CRNL);
@@ -422,8 +457,13 @@ LTSVParser_iternext(LTSVParser *self)
                 if (parse_process_char(self, c) < 0) {
                     goto err;
                 }
-                if (self->state == QUERY_FAIL)
+                //query fail. go next line
+                if (self->state == QUERY_FAIL){
+                    if(buf[linelen-1]=='\n'){
+                        self->state = EAT_CRNL;
+                    }
                     break;
+                }
             }
         } while (self->state != EAT_CRNL);
     }
