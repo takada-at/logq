@@ -206,7 +206,7 @@ execute_expr(Expr *expr, const char *val)
 }
 
 int
-Engine_read(Engine *self, int col, const char* val){
+Logq_Engine_read(Engine *self, int col, const char* val){
     if(col >= self->colsize)
         return 0;
 
@@ -238,12 +238,12 @@ Engine_transition(Engine* self, PyObject *args)
     if (!PyArg_ParseTuple(args, "is", &col, &val))
         return NULL;
 
-    Engine_read(self, col, val);
+    Logq_Engine_read(self, col, val);
     Py_RETURN_NONE;
 }
 
 PyObject *
-Engine_reset(Engine *self){
+Logq_Engine_reset(Engine *self){
     self->is_success = 0;
     self->is_fail = 0;
     self->state = self->start;
@@ -264,13 +264,13 @@ static struct PyMethodDef Engine_methods[] = {
     {"transition", (PyCFunction)Engine_transition, METH_VARARGS,
      "Engine transition"
     },
-    {"reset", (PyCFunction)Engine_reset, METH_NOARGS,
+    {"reset", (PyCFunction)Logq_Engine_reset, METH_NOARGS,
      "Engine reset"
     },
     {NULL}
 };
 
-PyTypeObject Engine_Type = {
+PyTypeObject Logq_Engine_Type = {
     PyObject_HEAD_INIT(NULL)
     0,                         /*ob_size*/
     "engine.Engine",           /*tp_name*/
@@ -313,13 +313,13 @@ PyTypeObject Engine_Type = {
 };
 
 int
-register_engine(PyObject *module)
+Logq_register_engine(PyObject *module)
 {
-    if (PyType_Ready(&Engine_Type) < 0)
+    if (PyType_Ready(&Logq_Engine_Type) < 0)
         return -1;
 
-    Py_INCREF(&Engine_Type);
-    if (PyModule_AddObject(module, "Engine", (PyObject *)&Engine_Type))
+    Py_INCREF(&Logq_Engine_Type);
+    if (PyModule_AddObject(module, "Engine", (PyObject *)&Logq_Engine_Type))
         return -1;
 
     return 1;

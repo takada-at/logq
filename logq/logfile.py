@@ -21,4 +21,6 @@ class LogFile(object):
 class CSVFile(LogFile):
     parser = engine.CSVParser
 
+class LTSVFile(LogFile):
+    parser = engine.LTSVParser
 

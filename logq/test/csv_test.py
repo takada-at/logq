@@ -32,6 +32,23 @@ def test_csv():
     print(res[3][4])
     assert ['a','fasfafafab','hogera',"1\nabc","b\"abc",'piyo'] == res[3]
 
+
+    tmp.close()
+    tmp = tempfile.NamedTemporaryFile()
+    tmp.write("2014-10-03 12:00:11,hoge\n"\
+              "2014-10-03 12:01:11,hoge\n"\
+              "2014-10-03 12:01:11,fuga\n"\
+              "2014-10-03 12:10:11,hoge\n"\
+    )
+    fileobj = tmp.file
+    fileobj.seek(0)
+
+    q = (col[0] >= '2014-10-03 12:00:00') & (col[0] < '2014-10-03 12:02:00') & (col[1]=='hoge')
+    eng = ef.compile_query(q)
+    colmap = {str(k): v for k, v in q.columns()}
+    parser = engine.CSVParser(eng, fileobj, colmap)
+    assert 2 == len(list(parser))
+
 def test_csv2():
     tmp = tempfile.NamedTemporaryFile()
     tmp.write("1,2,3,4,5,6\n"\

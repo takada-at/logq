@@ -3,5 +3,5 @@
 
 #include "colmap.h"
 
-int register_ltsv(PyObject *module);
+int Logq_register_ltsv(PyObject *module);
 #endif

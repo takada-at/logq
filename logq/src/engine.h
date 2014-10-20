@@ -4,7 +4,7 @@
 #include <Python.h>
 #include <structmember.h>
 
-extern PyTypeObject Engine_Type;
+extern PyTypeObject Logq_Engine_Type;
 
 typedef enum {
     NOP, STR_EQ, STR_NE, STR_LT, STR_LE, STR_GT, STR_GE, STR_IN, STR_NIN,
@@ -35,10 +35,10 @@ typedef struct {
     Expr *exprs;
 } Engine;
 
-int Engine_read(Engine *self, int col, const char* val);
+int Logq_Engine_read(Engine *self, int col, const char* val);
 
-PyObject* Engine_reset(Engine *self);
+PyObject* Logq_Engine_reset(Engine *self);
 
-int register_engine(PyObject *module);
+int Logq_register_engine(PyObject *module);
 
 #endif

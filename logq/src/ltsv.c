@@ -86,7 +86,7 @@ read_engine(LTSVParser *self)
     int i = 0;
     int len = self->val_size;
     for (i = 0; i < len; i++) {
-        Engine_read(self->engine, i, self->valmap[i]);
+        Logq_Engine_read(self->engine, i, self->valmap[i]);
     }
     return 1;
 }
@@ -278,7 +278,7 @@ parse_reset(LTSVParser *self)
     self->label_len = 0;
     self->state = START_RECORD;
     self->val_len = 0;
-    Engine_reset(self->engine);
+    Logq_Engine_reset(self->engine);
     self->col = 0;
     return 0;
 }
@@ -303,7 +303,7 @@ LTSVParser_new(PyTypeObject *type, PyObject *args, PyObject *kwargs)
     }
     if (!PyArg_ParseTupleAndKeywords(args, kwargs,
                                      "O!OO", parser_kws,
-                                     &Engine_Type, &engine,
+                                     &Logq_Engine_Type, &engine,
                                      &pyfile,
                                      &map)){
         return NULL;
@@ -361,7 +361,7 @@ LTSVParser_iternext_filelike(LTSVParser *self)
     PyObject *lineobj = NULL;
     long i;
     long linelen;
-    Engine_reset(self->engine);
+    Logq_Engine_reset(self->engine);
     while(!self->engine->is_success){
         if (parse_reset(self) < 0)
             return NULL;
@@ -424,7 +424,7 @@ LTSVParser_iternext(LTSVParser *self)
     PyObject *fields = NULL;
     long i;
     long linelen;
-    Engine_reset(self->engine);
+    Logq_Engine_reset(self->engine);
     while(!self->engine->is_success){
         if (parse_reset(self) < 0)
             return NULL;
@@ -570,7 +570,7 @@ static PyTypeObject LTSVParser_Type = {
 };
 
 int
-register_ltsv(PyObject *module)
+Logq_register_ltsv(PyObject *module)
 {
     if (PyType_Ready(&LTSVParser_Type) < 0)
         return -1;

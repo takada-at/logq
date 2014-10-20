@@ -9,6 +9,31 @@
  * CSVParser
  */
 
+typedef enum {
+    START_RECORD, START_FIELD, IN_FIELD,
+    IN_QUOTED_FIELD, QUOTE_IN_QUOTED_FIELD,
+    EAT_CRNL, QUERY_FAIL
+} ParserState;
+
+typedef struct {
+    PyObject_HEAD
+
+    Engine *engine;
+    ColMap *colmap;
+    PyObject *pyfile;
+    FILE *file;
+    PyObject *fields;           /* field list for current record */
+    ParserState state;          /* current CSV parse state */
+    char *field;                /* build current field in here */
+    int field_size;             /* size of allocated buffer */
+    int field_len;              /* length of current field */
+    int col;
+    int is_file;
+    unsigned long line_num;     /* Source-file line number */
+    char delimiter;
+    char quotechar;
+} CSVParser;
+
 static PyObject *csv_error_obj;     /* CSV exception */
 static long field_limit = 128 * 1024;   /* max parsed field size */
 
@@ -33,7 +58,7 @@ parse_save_field(CSVParser *self)
         sprintf(colname, "%d", self->col);
         colid = ColMap_get(self->colmap, colname);
         if(colid>=0){
-            Engine_read(self->engine, colid, string);
+            Logq_Engine_read(self->engine, colid, string);
         }
     }
     self->field_len = 0;
@@ -229,7 +254,7 @@ parse_reset(CSVParser *self)
         return -1;
     self->field_len = 0;
     self->state = START_RECORD;
-    Engine_reset(self->engine);
+    Logq_Engine_reset(self->engine);
     self->col = 0;
     return 0;
 }
@@ -258,7 +283,7 @@ CSVParser_new(PyTypeObject *type, PyObject *args, PyObject *kwargs)
     }
     if (!PyArg_ParseTupleAndKeywords(args, kwargs,
                                      "O!OO|cc", parser_kws,
-                                     &Engine_Type, &engine,
+                                     &Logq_Engine_Type, &engine,
                                      &pyfile,
                                      &map,
                                      &delimiter, &quotechar)){
@@ -313,7 +338,7 @@ CSVParser_iternext_filelike(CSVParser *self)
     PyObject *lineobj = NULL;
     long i;
     long linelen;
-    Engine_reset(self->engine);
+    Logq_Engine_reset(self->engine);
     while(!self->engine->is_success){
         if (parse_reset(self) < 0)
             return NULL;
@@ -379,7 +404,7 @@ CSVParser_iternext(CSVParser *self)
     PyObject *fields = NULL;
     long i;
     long linelen;
-    Engine_reset(self->engine);
+    Logq_Engine_reset(self->engine);
     while(!self->engine->is_success){
         if (parse_reset(self) < 0)
             return NULL;
@@ -528,7 +553,7 @@ static PyTypeObject CSVParser_Type = {
 };
 
 int
-register_csv(PyObject *module)
+Logq_register_csv(PyObject *module)
 {
     if (PyType_Ready(&CSVParser_Type) < 0)
         return -1;

@@ -29,7 +29,7 @@ initengine(void)
                                    MODULE_VERSION) == -1)
         return;
 
-    register_engine(module);
-    register_csv(module);
-    register_ltsv(module);
+    Logq_register_engine(module);
+    Logq_register_csv(module);
+    Logq_register_ltsv(module);
 }
