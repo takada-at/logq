@@ -14,16 +14,21 @@ class LogFile(object):
     def _create_parser(self, engine, colmap, fileobject):
         return self.parser(engine, fileobject, colmap)
 
+    def _colmap(self, query):
+        return {str(k): v for k, v in query.columns()}
+
     def search(self, query):
         ef.EngineFactory.set_engineclass(engine.Engine)
         eng = ef.compile_query(query)
-        colmap = {str(k): v for k, v in query.columns()}
         self.fileobject.seek(0)
+        colmap = self._colmap(query)
         return self._create_parser(eng, colmap, self.fileobject)
-
 
 class CSVFile(LogFile):
     parser = engine.CSVParser
+    def _colmap(self, query):
+        return query.col_list()
+
     def _create_parser(self, engine, colmap, fileobject):
         delimiter = bytes(self._params.get('delimiter', ','))
         quotechar = bytes(self._params.get('delimiter', '"'))

@@ -42,7 +42,6 @@ staticforward PyTypeObject CSVParser_Type;
 
 #define CSVParser_Check(v)   (Py_TYPE(v) == &CSVParser_Type)
 
-char colname[10];
 static int
 parse_save_field(CSVParser *self)
 {
@@ -55,8 +54,7 @@ parse_save_field(CSVParser *self)
 
     if(!self->engine->is_success){
         string = PyString_AS_STRING(field);
-        sprintf(colname, "%d", self->col);
-        colid = ColMap_get(self->colmap, colname);
+        colid = ColMap_get_int(self->colmap, self->col);
         if(colid>=0){
             Logq_Engine_read(self->engine, colid, string);
         }
@@ -306,10 +304,15 @@ CSVParser_new(PyTypeObject *type, PyObject *args, PyObject *kwargs)
             return NULL;
         }
     }
+    if(!PySequence_Check(map)){
+        PyErr_SetString(PyExc_TypeError,
+                        "argument 2 must be a list");
+        return NULL;
+    }
     colmap = ColMap_new(map);
     if (colmap == NULL) {
         PyErr_SetString(PyExc_TypeError,
-                        "argument 2 must be an dict");
+                        "argument 2 must be a list");
         return NULL;
     }
     self->colmap = colmap;

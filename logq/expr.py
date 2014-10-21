@@ -39,6 +39,14 @@ class Expr(Bool):
         colnames.sort()
         colids = [(colname, colid) for colid, colname in enumerate(colnames)]
         return colids
+    def col_list(self):
+        variables = self.variables
+        colnames = list({v.colname for v in variables})
+        colnames.sort()
+        res = [-1] * (max(colnames)+1)
+        for colid, colval in enumerate(colnames):
+            res[colval] = colid
+        return res
     def __and__(self, other):
         return qAnd(self, other)
     def __or__(self, other):

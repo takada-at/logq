@@ -22,7 +22,7 @@ def test_csv():
     col = [e.Column(i) for i in range(10)]
     q = (col[1]=="hoge") & (col[2]=="fuga") & (col[4]=="poyo") | (col[2]=="hogera") & (col[5]=="piyo")
     eng = ef.compile_query(q)
-    colmap = {str(k): v for k, v in q.columns()}
+    colmap = q.col_list()
     print(colmap)
     parser = engine.CSVParser(eng, fileobj, colmap)
     assert parser
@@ -31,7 +31,6 @@ def test_csv():
     assert [['a', 'b', 'hogera', '1', '2', 'piyo'], ['1', 'hoge', 'fuga', '4', 'poyo', '6'], ['a', 'b', 'hogera', '1', '2', 'piyo']] == res[:3]
     print(res[3][4])
     assert ['a','fasfafafab','hogera',"1\nabc","b\"abc",'piyo'] == res[3]
-
 
     tmp.close()
     tmp = tempfile.NamedTemporaryFile()
@@ -45,7 +44,7 @@ def test_csv():
 
     q = (col[0] >= '2014-10-03 12:00:00') & (col[0] < '2014-10-03 12:02:00') & (col[1]=='hoge')
     eng = ef.compile_query(q)
-    colmap = {str(k): v for k, v in q.columns()}
+    colmap = q.col_list()
     parser = engine.CSVParser(eng, fileobj, colmap)
     assert 2 == len(list(parser))
 
@@ -64,7 +63,7 @@ def test_csv2():
     col = [e.Column(i) for i in range(10)]
     q = (col[1]=="hoge") & (col[2]=="fuga") & (col[4]=="poyo") | (col[2]=="hogera") & (col[5]=="piyo")
     eng = ef.compile_query(q)
-    colmap = {str(k): v for k, v in q.columns()}
+    colmap = q.col_list()
     parser = engine.CSVParser(eng, tmp, colmap)
     assert parser
     res = list(parser)
@@ -76,7 +75,7 @@ def test_csv2():
     tmp.seek(0)
     q2 = (col[1].contains('og')) & (col[2]=="fuga") & (col[4]=="poyo") | (col[2]=="hogera") & (col[5]=="piyo")
     eng = ef.compile_query(q)
-    colmap = {str(k): v for k, v in q.columns()}
+    colmap = q.col_list()
     parser = engine.CSVParser(eng, tmp, colmap)
 
     res = list(parser)
@@ -100,7 +99,7 @@ def test_csv3():
     col = [e.Column(i) for i in range(10)]
     q = (col[1]=="hoge") & (col[2]=="fuga") & (col[4]=="poyo") | (col[2]=="hogera") & (col[5]=="piyo")
     eng = ef.compile_query(q)
-    colmap = {str(k): v for k, v in q.columns()}
+    colmap = q.col_list()
     print(colmap)
     parser = engine.CSVParser(eng, fileobj, colmap, delimiter=b"\t")
     assert parser
@@ -110,7 +109,7 @@ def test_csv3():
     q = col[0]=="a"
     fileobj.seek(0)
     eng = ef.compile_query(q)
-    colmap = {str(k): v for k, v in q.columns()}
+    colmap = q.col_list()
     parser = engine.CSVParser(eng, fileobj, colmap, delimiter=b"\t")
     assert 3==len(list(parser))
 
@@ -123,14 +122,14 @@ def test_csv3():
     fileobj.seek(0)
     q = e.Column(0)=='hoge'
     eng = ef.compile_query(q)
-    colmap = {str(k): v for k, v in q.columns()}
+    colmap = q.col_list()
     parser = engine.CSVParser(eng, fileobj, colmap)
     assert 1==len(list(parser))
 
     fileobj.seek(0)
     q = e.Column(50)=="fuga"
     eng = ef.compile_query(q)
-    colmap = {str(k): v for k, v in q.columns()}
+    colmap = q.col_list()
     parser = engine.CSVParser(eng, fileobj, colmap)
     assert 1==len(list(parser))
 
@@ -147,7 +146,7 @@ def test_csv3():
 
     q = e.Column(1)=='bcd'
     eng = ef.compile_query(q)
-    colmap = {str(k): v for k, v in q.columns()}
+    colmap = q.col_list()
     parser = engine.CSVParser(eng, fileobj, colmap)
     assert 1==len(list(parser))
 
@@ -169,7 +168,8 @@ def test_csv4():
 
     ef.EngineFactory.engineclass = engine.Engine
     eng = ef.compile_query(q)
-    colmap = {str(k): v for k, v in q.columns()}
+    colmap = q.col_list()
+    print(colmap)
     parser = engine.CSVParser(eng, fileobj, colmap, delimiter=b'\t')
     r = list(parser)
     assert 2==len(r)
