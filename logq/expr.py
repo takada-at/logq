@@ -34,15 +34,17 @@ class OpCodes(object):
 
 class Expr(Bool):
     def columns(self):
-        variables = self.variables
+        variables = filter(lambda x:isinstance(x, BinOp), self.variables)
         colnames = list({v.colname for v in variables})
         colnames.sort()
         colids = [(colname, colid) for colid, colname in enumerate(colnames)]
         return colids
     def col_list(self):
-        variables = self.variables
+        variables = filter(lambda x:isinstance(x, BinOp), self.variables)
         colnames = list({v.colname for v in variables})
         colnames.sort()
+        if not colnames:
+            return []
         res = [-1] * (max(colnames)+1)
         for colid, colval in enumerate(colnames):
             res[colval] = colid
@@ -63,6 +65,13 @@ class qAtomic(Expr, Atomic):
     def _construct(self):
         eng = OpCodes()
         eng.add_codes(self.colname, self.ops)
+        return eng
+
+class Top(qAtomic):
+    def __init__(self, name='T'):
+        self.name = name
+    def _construct(self):
+        eng = OpCodes()
         return eng
 
 class Column(object):

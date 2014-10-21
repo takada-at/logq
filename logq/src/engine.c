@@ -50,6 +50,8 @@ static Operator read_op(const char *op){
         return STR_IN;
     else if(strcmp(op, "nin")==0)
         return STR_NIN;
+    else if(strcmp(op, "nop")==0)
+        return NOP;
     else
         return NOP;
 

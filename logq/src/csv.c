@@ -12,7 +12,7 @@
 typedef enum {
     START_RECORD, START_FIELD, IN_FIELD,
     IN_QUOTED_FIELD, QUOTE_IN_QUOTED_FIELD,
-    EAT_CRNL, QUERY_FAIL
+    QUERY_FAIL
 } ParserState;
 
 typedef struct {
@@ -110,11 +110,8 @@ parse_process_char(CSVParser *self, char c)
     switch (self->state) {
     case START_RECORD:
         /* start of record */
-        if (c == '\0')
-            /* empty line - return [] */
-            break;
-        else if (c == '\n' || c == '\r') {
-            self->state = EAT_CRNL;
+        if (c == '\n' || c == '\r') {
+            self->state = START_RECORD;
             break;
         }
         /* normal character - handle as START_FIELD */
@@ -126,10 +123,7 @@ parse_process_char(CSVParser *self, char c)
             /* save empty field - return [fields] */
             if (parse_save_field(self) < 0)
                 return -1;
-            self->state = EAT_CRNL;
-        }
-        else if (c == '\0'){
-            break;
+            self->state = START_RECORD;
         }
         else if (c == self->quotechar) {
             /* start quoted field */
@@ -154,10 +148,7 @@ parse_process_char(CSVParser *self, char c)
             /* end of line - return [fields] */
             if (parse_save_field(self) < 0)
                 return -1;
-            self->state = EAT_CRNL;
-        }
-        else if(c == '\0') {
-            //go next line
+            self->state = START_RECORD;
         }
         else if (c == self->delimiter) {
             /* save field - wait for new field */
@@ -178,9 +169,7 @@ parse_process_char(CSVParser *self, char c)
 
     case IN_QUOTED_FIELD:
         /* in quoted field */
-        if (c == '\0')
-            ;
-        else if (c == self->quotechar) {
+        if (c == self->quotechar) {
             /* doublequote; " represented by "" */
             self->state = QUOTE_IN_QUOTED_FIELD;
         }
@@ -206,7 +195,7 @@ parse_process_char(CSVParser *self, char c)
 
             self->state = START_FIELD;
         }
-        else if (c == '\n' || c == '\r' || c == '\0') {
+        else if (c == '\n' || c == '\r') {
             /* end of line - return [fields] */
             if (parse_save_field(self) < 0)
                 return -1;
@@ -223,19 +212,8 @@ parse_process_char(CSVParser *self, char c)
         }
         break;
 
-    case EAT_CRNL:
-        if (c == '\n' || c == '\r')
-            ;
-        else if (c == '\0')
-            self->state = START_RECORD;
-        else {
-            PyErr_Format(csv_error_obj, "new-line character seen in unquoted field - do you need to open the file in universal-newline mode?");
-            return -1;
-        }
-        break;
-
     case QUERY_FAIL:
-        if (c == '\n' || c == '\r' || c=='\0') {
+        if (c == '\n' || c == '\r') {
             self->state = START_RECORD;
         }
         break;
@@ -385,8 +363,6 @@ CSVParser_iternext_filelike(CSVParser *self)
                 }
             }
             Py_DECREF(lineobj);
-            if (parse_process_char(self, 0) < 0)
-                goto err;
         } while (self->state != START_RECORD);
     }
     fields = self->fields;
@@ -449,8 +425,6 @@ CSVParser_iternext(CSVParser *self)
                     break;
                 }
             }
-            if (parse_process_char(self, 0) < 0)
-                goto err;
         } while (self->state != START_RECORD);
     }
     fields = self->fields;

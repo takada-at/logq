@@ -146,7 +146,11 @@ class EngineFactory():
         return self.construct(opcodes, colids)
     def dict2table(self, poslist, colids, dic):
         res = []
-        last = max(poslist.state(poslist[-1]), self.FAIL)
+        if len(poslist)<=1:
+            last = self.FAIL
+        else:
+            last = poslist.state(poslist[-1])
+
         for i in range(last+1):
             res.append([0 for col in colids])
 
@@ -198,6 +202,9 @@ class EngineFactory():
                     self.success_table[state] = poslist.state(npos)
                 else:
                     self.success_table[state] = success
+
+        if len(poslist)==0:
+            start = success
 
         expr_table = self.dict2table(poslist, colids, self.expr_table)
         exprs = self.opids.items()
