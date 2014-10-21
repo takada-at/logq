@@ -200,10 +200,7 @@ parse_process_char(CSVParser *self, char c)
             if (parse_save_field(self) < 0)
                 return -1;
 
-            if(self->engine->is_fail)
-                self->state = QUERY_FAIL;
-            else
-                self->state = START_FIELD;
+            self->state = START_RECORD;
         }else{
             if(parse_add_char(self, c) < 0)
                 return -1;

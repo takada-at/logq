@@ -35,5 +35,8 @@ def testCSVFile():
     q = col[0] >= ''
     logfile = CSVFile(fio)
     r = list(logfile.search(q))
-    assert 4==len(list(r))
+    for row in r:
+        print("\t".join(row))
+        assert 3==len(row)
+    assert 9==len(list(r))
 
