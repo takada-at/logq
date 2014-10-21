@@ -20,7 +20,6 @@ class LogFile(object):
     def search(self, query):
         ef.EngineFactory.set_engineclass(engine.Engine)
         eng = ef.compile_query(query)
-        self.fileobject.seek(0)
         colmap = self._colmap(query)
         return self._create_parser(eng, colmap, self.fileobject)
 

@@ -183,9 +183,12 @@ parse_process_char(LTSVParser *self, char c)
         self->state = START_LABEL;
         /* fallthru */
     case START_LABEL:
+        /*
+           lbyte = %x30-39 / %x41-5A / %x61-7A / "_" / "." / "-" ;; [0-9A-Za-z_.-]
+        */
         /* expecting field */
         if (c == '\n' || c == '\r') {
-            /* save empty field - return [fields] */
+            /* empty field  */
             self->state = EAT_CRNL;
         }
         else if (c == ':') {
@@ -208,6 +211,7 @@ parse_process_char(LTSVParser *self, char c)
         break;
     case IN_LABEL:
         if (c == '\n' || c == '\r') {
+            // invalid format
             /* end of line - return [fields] */
             self->state = EAT_CRNL;
         }
@@ -218,6 +222,11 @@ parse_process_char(LTSVParser *self, char c)
 
             self->state = IN_FIELD;
         }
+        else if (c == '\t') {
+            /* save empty field */
+            if (parse_save_field(self) < 0)
+                return -1;
+        }
         else {
             /* normal character - save in field */
             if (parse_add_char(self, c) < 0)
@@ -225,9 +234,11 @@ parse_process_char(LTSVParser *self, char c)
         }
         break;
     case IN_FIELD:
-        /* in unquoted field */
+        /*
+          fbyte = %x01-08 / %x0B / %x0C / %x0E-FF
+         */
         if (c == '\n' || c == '\r') {
-            /* end of line - return [fields] */
+            /* end of line  */
             if (parse_save_field(self) < 0)
                 return -1;
             self->state = EAT_CRNL;
@@ -249,14 +260,6 @@ parse_process_char(LTSVParser *self, char c)
         }
         break;
     case EAT_CRNL:
-        if (c == '\n' || c == '\r')
-            ;
-        else if (c == '\0')
-            self->state = START_RECORD;
-        else {
-            PyErr_Format(ltsv_error_obj, "new-line character seen in unquoted field - do you need to open the file in universal-newline mode?");
-            return -1;
-        }
         break;
     case QUERY_FAIL:
         if (c == '\n' || c == '\r' || c=='\0') {
