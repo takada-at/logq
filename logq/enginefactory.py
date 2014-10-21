@@ -90,17 +90,16 @@ class PosList():
                 return npos
 
         return None
-    def successstate(self, pos):
+    def successstate(self, idx, pos):
         """
         成功した場合
 
-        同じ状態で、同じ列でこれよりあとの行か、次の列を検索
+        行の状態は同じでこれよりあとの行か、次の列
         """
-        rowid = pos[1]
         rowstate = pos[0]
-        k = (pos[2], rowid) # col, row
-        for pos2 in self:
-            if pos2[0]==rowstate and (pos2[2], pos2[1]) > k:
+        k = (pos[2], pos[1]) # col, row
+        for pos2 in self[idx+1:]:
+            if pos2[0] == rowstate and (pos2[2], pos2[1]) >= k:
                 return pos2
 
         return None
@@ -188,11 +187,13 @@ class EngineFactory():
             else:
                 self.fail_table[state] = fail
 
+            # この行にこれ以上式がないならば成功すれば終了
             right = poslist.findright(idx, pos)
             if not right:
                 self.success_table[state] = success
             else:
-                npos = poslist.successstate(pos)
+                # 次に評価する式を探す
+                npos = poslist.successstate(idx, pos)
                 if npos:
                     self.success_table[state] = poslist.state(npos)
                 else:

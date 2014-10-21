@@ -26,4 +26,3 @@ def testCSVFile():
     r = logfile.search(q)
     assert 2==len(list(r))
 
-

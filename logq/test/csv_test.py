@@ -150,3 +150,27 @@ def test_csv3():
     colmap = {str(k): v for k, v in q.columns()}
     parser = engine.CSVParser(eng, fileobj, colmap)
     assert 1==len(list(parser))
+
+def test_csv4():
+    tmp = tempfile.NamedTemporaryFile()
+    tmp.write("s:1\ttime:2014-10-01 04:00:00\thoge\tu:123\n"\
+              "s:2\ttime:2014-10-01 04:04:00\thoge\tu:223\n"\
+              "s:3\ttime:2014-10-01 04:04:00\thoge\tu:123\n"\
+              "s:1\ttime:2014-10-01 04:04:30\thoge\tu:123\n"\
+              "s:1\ttime:2014-10-01 04:05:30\thoge\tu:123\n"\
+                  )
+    col = [e.Column(i) for i in range(10)]
+    q = (col[3]=="u:123") & (col[1]>= 'time:2014-10-01 04:04:00')  & (col[1] < 'time:2014-10-01 04:05:00')
+    fileobj = tmp.file
+    fileobj.seek(0)
+    ef.EngineFactory.engineclass = ef.PyEngine
+    eng0 = ef.compile_query(q)
+    print(eng0.format())
+
+    ef.EngineFactory.engineclass = engine.Engine
+    eng = ef.compile_query(q)
+    colmap = {str(k): v for k, v in q.columns()}
+    parser = engine.CSVParser(eng, fileobj, colmap, delimiter=b'\t')
+    r = list(parser)
+    assert 2==len(r)
+    assert r[0][1] == 'time:2014-10-01 04:04:00'
