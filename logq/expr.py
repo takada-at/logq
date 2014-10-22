@@ -67,13 +67,6 @@ class qAtomic(Expr, Atomic):
         eng.add_codes(self.colname, self.ops)
         return eng
 
-class Top(qAtomic):
-    def __init__(self, name='T'):
-        self.name = name
-    def _construct(self):
-        eng = OpCodes()
-        return eng
-
 class Column(object):
     def __init__(self, name):
         self.colname = name

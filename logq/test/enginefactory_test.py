@@ -104,13 +104,3 @@ def test_EngineFactory3():
     print(eng.format())
     assert eng.success_table[0][0]!=1
 
-def test_EngineFactory4():
-    reload(ef)
-    fac = ef.EngineFactory()
-    ef.EngineFactory.set_engineclass(ef.PyEngine)
-    q = e.Top()
-    eng = ef.compile_query(q)
-    print(eng.success_table)
-    assert eng
-    print(eng.format())
-    #assert eng.success_table[0][0]==1

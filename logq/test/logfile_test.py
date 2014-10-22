@@ -2,7 +2,9 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 from ..logfile import CSVFile
+from ..logfile import LTSVFile
 from .. import expr as e
+import logq
 import tempfile
 
 def testCSVFile():
@@ -28,7 +30,7 @@ def testCSVFile():
     r = logfile.search(q)
     assert 2==len(list(r))
 
-def testCSVFile():
+def testCSVFile2():
     import os
     fio = open(os.path.join(os.path.dirname(__file__), 'sample0.csv'))
     col = [e.Column(i) for i in range(10)]
@@ -36,7 +38,19 @@ def testCSVFile():
     logfile = CSVFile(fio)
     r = list(logfile.search(q))
     for row in r:
-        print("\t".join(row))
         assert 3==len(row)
     assert 9==len(list(r))
+
+def testLTSVFile():
+    import os
+    fio = open(os.path.join(os.path.dirname(__file__), 'sample0.ltsv'))
+    q = logq.col('host') >= ''
+    logfile = LTSVFile(fio)
+    r = list(logfile.search(q))
+    keys = {'host', 'ident', 'user', 'time', 'req', 'status', 'size', 'referer', 'ua'}
+    for row in r:
+        assert len(keys)==len(row)
+        assert keys == set(dict(row).keys())
+
+    assert 3==len(list(r))
 
