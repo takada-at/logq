@@ -12,6 +12,7 @@ def test_EngineFactory():
     eng = ef.compile_query(q)
     colids = {colname: cid for cid, colname in enumerate((1,2,4,5))}
     assert eng
+    print(q)
     print(eng.format())
     state = 0
     col = colids[1]

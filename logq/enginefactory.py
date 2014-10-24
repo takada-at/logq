@@ -5,6 +5,8 @@ EngineFactory
 ===============
 """
 
+from collections import deque
+from collections import namedtuple
 from .engine import Engine
 
 def compile_query(expr):
@@ -69,41 +71,50 @@ class PyEngine(object):
                     self.is_fail = self.state == self.fail
             else:
                 return None
-
+Position = namedtuple('Position', 'rowstate row col oppos opid')
 class PosList():
     def __init__(self, state, excludes=None):
         if excludes is None: excludes = set()
         self.excludes = excludes
         self.posdict = dict()
-        self._state = state
+        self.state = state
         self.poslist = []
+    def new_state(self):
+        self.state += 1
+        while self.state in self.excludes:
+            self.state += 1
+
+        return self.state
     def state(self, pos):
         return self.posdict[pos]
-    def findright(self, idx, pos):
+    def findright(self, pos):
         """
         状態が同じで、行が同じものがあるかどうかを探す。
         """
-        rowstate = pos[0]
-        rowid = pos[1]
-        for npos in self[idx+1:]:
-            if npos[0]==rowstate and npos[1]==rowid:
+        row = pos.row
+        rowstate = pos.rowstate
+        key = (pos.col, pos.oppos)
+        for npos in self:
+            if npos.rowstate==rowstate and npos.row==row \
+                    and (npos.col, npos.oppos) > key:
                 return npos
 
         return None
-    def successstate(self, idx, pos):
+    def successstate(self, pos):
         """
         成功した場合
 
         行の状態は同じでこれよりあとの行か、次の列
         """
-        rowstate = pos[0]
-        k = (pos[2], pos[1]) # col, row
-        for pos2 in self[idx+1:]:
-            if pos2[0] == rowstate and (pos2[2], pos2[1]) >= k:
+        oppos = pos.oppos
+        rowstate = pos.rowstate
+        k = (pos.col, pos.row, oppos)
+        for pos2 in self:
+            if pos2.rowstate != rowstate: continue
+            if (pos2.col, pos2.row, pos2.oppos) > k: 
                 return pos2
 
         return None
-
     def failstate(self, pos):
         """
         失敗した場合
@@ -125,11 +136,8 @@ class PosList():
     def __iter__(self):
         return iter(self.poslist)
     def add(self, pos):
+        if pos in self.posdict: return
         self.poslist.append(pos)
-        self.posdict[pos] = self._state
-        self._state += 1
-        while self._state in self.excludes:
-            self._state += 1
 
 class EngineFactory():
     engineclass = Engine
@@ -146,18 +154,12 @@ class EngineFactory():
         return self.construct(opcodes, colids)
     def dict2table(self, poslist, colids, dic):
         res = []
-        if len(poslist)<=1:
-            last = self.FAIL
-        else:
-            last = poslist.state(poslist[-1])
-
+        last = max(self.FAIL, poslist.state)
         for i in range(last+1):
             res.append([0 for col in colids])
 
-        for pos in poslist:
-            st = poslist.state(pos)
-            col = pos[2]
-            res[st][col] = dic[st]
+        for col, st in dic.keys():
+            res[st][col] = dic[col, st]
 
         return res
     def construct(self, opcodes, colids):
@@ -176,36 +178,7 @@ class EngineFactory():
         fail = self.FAIL
         poslist = PosList(0, excludes={1,2})
         self._construct_poslist(opcodes.table, colids, poslist)
-        for idx, pos in enumerate(poslist):
-            state = poslist.state(pos)
-            rowstate, rowid, col, oppos, opid = pos
-            self.expr_table[state] = opid
-            if idx==len(poslist)-1:
-                self.success_table[state] = success
-                self.fail_table[state] = fail
-                break
-
-            nextrow = poslist.failstate(pos)
-            if nextrow:
-                self.fail_table[state] = poslist.state(nextrow)
-            else:
-                self.fail_table[state] = fail
-
-            # この行にこれ以上式がないならば成功すれば終了
-            right = poslist.findright(idx, pos)
-            if not right:
-                self.success_table[state] = success
-            else:
-                # 次に評価する式を探す
-                npos = poslist.successstate(idx, pos)
-                if npos:
-                    self.success_table[state] = poslist.state(npos)
-                else:
-                    self.success_table[state] = success
-
-        if len(poslist)==0:
-            start = success
-
+        self._construct_table(poslist, start, success, fail)
         expr_table = self.dict2table(poslist, colids, self.expr_table)
         exprs = self.opids.items()
         exprs.sort(key=lambda x:x[1])
@@ -225,5 +198,37 @@ class EngineFactory():
                     exprs = row[colname]
                     for oppos, ops in enumerate(exprs):
                         opid = self.opids[ops]
-                        pos = (rowstate, rowid, colid, oppos, opid)
+                        pos = Position(rowstate, rowid, colid, oppos, opid)
                         poslist.add(pos)
+
+    def _construct_table(self, poslist, start, success, fail):
+        if not poslist: return
+        que = deque([(start, poslist[0])])
+        while que:
+            state, pos = que.popleft()
+            rowstate, rowid, col, oppos, opid = pos
+            self.expr_table[col, state] = opid
+            # 失敗の場合
+            npos = poslist.failstate(pos)
+            if npos:
+                nstate = poslist.new_state()
+                self.fail_table[col, state] = nstate
+                que.append((nstate, npos))
+            else:
+                # 次がないので終了
+                self.fail_table[col, state] = fail
+
+            # 成功の場合
+            right = poslist.findright(pos)
+            if not right:
+                # この行にこれ以上式がないので成功すれば終了
+                self.success_table[col, state] = success
+            else:
+                # 次に評価する式を探す
+                npos = poslist.successstate(pos)
+                if npos:
+                    nstate = poslist.new_state()
+                    self.success_table[col, state] = nstate
+                    que.append((nstate, npos))
+                else:
+                    self.success_table[col, state] = success
