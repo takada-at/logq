@@ -215,7 +215,9 @@ Logq_Engine_read(Engine *self, int col, const char* val){
     Expr *expr;
     int expr_id;
     while(1){
+        //printf("hoge\n");
         expr_id = self->expr_table[(self->state) * (self->colsize) + col];
+        //printf("%d %d %s %i\n", col, self->state, val, expr_id);
         if(expr_id){
             expr = self->exprs + expr_id;
             if(execute_expr(expr, val)){

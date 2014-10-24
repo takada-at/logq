@@ -29,7 +29,7 @@ class PyEngine(object):
         self.is_success = False
         self.is_fail = False
     def format_op(self, op):
-        return " {}{}".format(*op)
+        return "{}{}".format(*op)
     def format(self):
         cols = [""] + map(str, self.cols)
         res = ["\t".join(cols)]
@@ -39,7 +39,7 @@ class PyEngine(object):
                 if val==0:
                     s = ''
                 else:
-                    expr  = self.format_op(self.exprs[val])
+                    expr  = "[{}]".format(colid) + self.format_op(self.exprs[val])
                     succ  = self.success_table[st][colid]
                     fail  = self.fail_table[st][colid]
                     if succ==self.success:

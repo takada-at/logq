@@ -55,15 +55,17 @@ def test_Engine():
     q = (col[1]=="hoge") & (col[2]=="fuga") & (col[4]=="poyo") | (col[2]=="hogera") & (col[5]=="piyo")
     eng = ef.compile_query(q)
     assert eng
+    print(q)
+    print(eng.format())
     colids = {colname: cid for cid, colname in enumerate((1,2,4,5))}
     for colid, c in enumerate(['aa', 'hoge', 'fuga', 'bbb', 'poyo', 'fa']):
         if colid in colids:
+            print(colids[colid], c)
             eng.transition(colids[colid], c)
 
         if eng.is_success: break
 
     assert eng.is_success
-
     eng.reset()
     for colid, c in enumerate(['aa', 'hoge', 'hogera', 'bbb', 'poyo', 'piyo']):
         if colid in colids:
