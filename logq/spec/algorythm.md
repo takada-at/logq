@@ -120,7 +120,7 @@ rowstate = makerowstate()
 expr_table = new Table()
 success_table = new Table()
 fail_table = new Table()
-que = [(初期状態, rowstate, exprlist[0])]
+que = [(start, rowstate, exprlist[0])]
 while que:
     state, rowstate, expr = que.popleft()
     # 行と列を取得
