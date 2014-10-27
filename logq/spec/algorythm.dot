@@ -1,0 +1,19 @@
+digraph dfa {
+ graph [size = "10, 6"];
+ 1 [peripheries = 2];
+ 2 [style = dashed];
+ 0 -> 3 [label = "[1]!=hoge"];
+ 0 -> 1 [label = "[1]=hoge"];
+ 3 -> 4 [label = "[2]!=fuga"];
+ 3 -> 5 [label = "[2]=fuga"];
+ 4 -> 4 [label = "[2]=hogera"];
+ 4 -> 2 [label = "[2]!=hogera"];
+ 5 -> 3 [label = "[2]=hogera"];
+ 5 -> 6 [label = "[2]!=hogera"];
+ 3 -> 1 [label = "[2]=poyo"];
+ 3 -> 4 [label = "[2]!=poyo"];
+ 6 -> 1 [label = "[2]=poyo"];
+ 6 -> 2 [label = "[2]!=poyo"];
+ 4 -> 1 [label = "[3]=piyo"];
+ 4 -> 2 [label = "[3]!=piyo"];
+}

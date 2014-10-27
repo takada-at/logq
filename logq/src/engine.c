@@ -214,15 +214,16 @@ Logq_Engine_read(Engine *self, int col, const char* val){
 
     Expr *expr;
     int expr_id;
+    int state = self->state;
     while(1){
-        //printf("hoge\n");
         expr_id = self->expr_table[(self->state) * (self->colsize) + col];
-        //printf("%d %d %s %i\n", col, self->state, val, expr_id);
         if(expr_id){
             expr = self->exprs + expr_id;
             if(execute_expr(expr, val)){
                 self->state      = self->success_table[(self->state) * (self->colsize) + col];
                 self->is_success = self->state==self->success;
+                if(self->state<=state)
+                    break;
             }else{
                 self->state   = self->fail_table[(self->state) * (self->colsize) + col];
                 self->is_fail = self->state==self->fail;
@@ -230,6 +231,7 @@ Logq_Engine_read(Engine *self, int col, const char* val){
         }else{
             break;
         }
+        state = self->state;
     }
     return 1;
 }

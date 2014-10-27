@@ -107,3 +107,37 @@ def test_EngineFactory3():
     print(eng.format())
     assert eng.success_table[0][0]!=1
 
+def test_EngineFactory4():
+    cols = [e.Column(i) for i in range(10)]
+    q = (cols[1]=='hoge') | (cols[2]=='fuga') & (cols[4]=='poyo') | (cols[2]=='hogera') & (cols[5]=='piyo')
+    fac = ef.EngineFactory()
+    ef.EngineFactory.set_engineclass(ef.PyEngine)
+    eng = ef.compile_query(q)
+    assert eng
+    print(q)
+    print(eng.format())
+
+def test_EngineFactory5():
+    cols = [e.Column(i) for i in range(10)]
+    q = (cols[0] >= '2014-10-03 12:00:00') & (cols[0] < '2014-10-03 12:02:00') & (cols[1]=='hoge')
+    fac = ef.EngineFactory()
+    ef.EngineFactory.set_engineclass(ef.PyEngine)
+    eng = ef.compile_query(q)
+    print(eng.format())
+    data = [
+        ["2014-10-03 12:00:11", "hoge"],
+        ["2014-10-03 12:01:11", "hoge"],
+        ["2014-10-03 12:01:11", "fuga"],
+        ["2014-10-03 12:10:11", "hoge"],
+        ]
+    cnt = 0
+    for row in data:
+        eng.reset()
+        for colid, val in enumerate(row):
+            eng.transition(colid, val)
+
+        if eng.is_success:
+            cnt += 1
+
+    assert 2 == cnt
+
