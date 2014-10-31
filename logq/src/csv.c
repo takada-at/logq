@@ -430,6 +430,63 @@ err:
     return fields;
 }
 
+#define logq_readc(buf) c = *(buf)++;                 \
+    if (parse_process_char(self, c) < 0) {            \
+        goto err;                                     \
+    }                                                 \
+    if(c=='\n' && self->state==START_RECORD){         \
+        if(self->engine->is_success)                  \
+            PyList_Append(datas, self->fields);       \
+        self->fields = NULL;                          \
+        if (parse_reset(self) < 0)                    \
+            goto err;                                 \
+    }                                                 \
+
+static PyObject *
+CSVParser_fread(CSVParser *self, size_t size)
+{
+    char *buf = PyMem_Malloc(sizeof(char)*size);
+    if(buf==NULL){
+        PyErr_NoMemory();
+        return NULL;
+    }
+    char c;
+    size_t readsize;
+    PyObject *datas = PyList_New(0);
+    if(self->fields==NULL){
+        parse_reset(self);
+    }
+    while(size){
+        PyFile_IncUseCount((PyFileObject*)self->pyfile);
+        Py_BEGIN_ALLOW_THREADS
+        readsize = fread(buf, 1, size, self->file);
+        Py_END_ALLOW_THREADS
+        PyFile_DecUseCount((PyFileObject*)self->pyfile);
+        if(readsize==0)
+            break;
+
+        size -= readsize;
+        while(readsize--) {
+            logq_readc(buf)
+        }
+    }
+err:
+    return datas;
+}
+
+static PyObject *
+CSVParser_read(CSVParser *self, PyObject *args)
+{
+    int size = 1024 * 1024;
+    PyObject *result = NULL;
+    if(PyArg_ParseTuple(args, "|i", &size)){
+        if(self->is_file){
+            result = CSVParser_fread(self, (size_t)size);
+        }
+    }
+    return result;
+}
+
 static void
 CSVParser_dealloc(CSVParser *self)
 {
@@ -470,6 +527,7 @@ PyDoc_STRVAR(CSVParser_Type_doc,
 );
 
 static struct PyMethodDef CSVParser_methods[] = {
+    {"read", (PyCFunction)CSVParser_read, METH_VARARGS, ""},
     { NULL, NULL }
 };
 #define R_OFF(x) offsetof(CSVParser, x)
