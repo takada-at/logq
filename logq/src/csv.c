@@ -430,6 +430,19 @@ err:
     return fields;
 }
 
+static PyObject *
+CSVParser_feof(CSVParser *self)
+{
+    if(self->is_file){
+        if(feof(self->file)){
+            Py_INCREF(Py_True);
+            return Py_True;
+        }
+    }
+    Py_INCREF(Py_False);
+    return Py_False;
+}
+
 #define logq_readc(buf) c = *(buf)++;                 \
     if (parse_process_char(self, c) < 0) {            \
         goto err;                                     \
@@ -528,6 +541,7 @@ PyDoc_STRVAR(CSVParser_Type_doc,
 
 static struct PyMethodDef CSVParser_methods[] = {
     {"read", (PyCFunction)CSVParser_read, METH_VARARGS, ""},
+    {"eof", (PyCFunction)CSVParser_feof, METH_NOARGS, ""},
     { NULL, NULL }
 };
 #define R_OFF(x) offsetof(CSVParser, x)
