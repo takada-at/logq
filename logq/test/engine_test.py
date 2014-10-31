@@ -14,9 +14,8 @@ def test_cEngine():
     assert eng.fail == 2
     colids = {colname: cid for cid, colname in enumerate((1,2,4,5))}
     for colid, c in enumerate(['aa', 'hoge', 'fuga', 'bbb', 'poyo', 'fa']):
-        s = True;
         if colid in colids:
-            s = eng.transition(colids[colid], c)
+            eng.transition(colids[colid], c)
 
         if eng.is_success: break
 

@@ -62,7 +62,7 @@ class PyEngine(object):
         elif op=='>=':
             return val>=arg
         elif op=='<=':
-            return var<=arg
+            return val<=arg
         elif op=='>':
             return val>arg
         elif op=='<':
@@ -91,83 +91,63 @@ class PyEngine(object):
             state = self.state
 
         return True
-Position = namedtuple('Position', 'rowstate row col idxincol opid')
-class PosList():
+
+ExprNode = namedtuple('ExprNode', 'col row index id')
+class ExprList():
     def __init__(self, state, excludes=None):
         if excludes is None: excludes = set()
         self.excludes = excludes
-        self.posdict = dict()
         self.state = state
-        self.poslist = []
+        self.startnode = None
+        self.exprlist = dict()
         self.statecache = dict()
-    def set_start(self, pos):
-        self.statecache[pos.rowstate, pos.idxincol] = self.state
-    def new_state(self, pos):
-        if (pos.rowstate, pos.idxincol) in self.statecache:
-            return self.statecache[pos.rowstate, pos.idxincol]
+    def maxrowstate(self):
+        return max(self.exprlist.keys())
+    def set_start(self, rowstate, expr):
+        self.statecache[rowstate, expr.index] = self.state
+        self.startnode = (rowstate, expr)
+    def new_state(self, rowstate, index):
+        if (rowstate, index) in self.statecache:
+            return self.statecache[rowstate, index]
 
         self.state += 1
         while self.state in self.excludes:
             self.state += 1
 
-        self.statecache[pos.rowstate, pos.idxincol] = self.state
+        self.statecache[rowstate, index] = self.state
         return self.state
-    def state(self, pos):
-        return self.posdict[pos]
-    def findright(self, pos):
+    def findright(self, rowstate, expr):
         """
         状態が同じで、行が同じものがあるかどうかを探す。
         """
-        row = pos.row
-        rowstate = pos.rowstate
-        key = (pos.col, pos.idxincol)
-        for npos in self:
-            if npos.rowstate==rowstate and npos.row==row \
-                    and (npos.col, npos.idxincol) > key:
-                return npos
+        if rowstate not in self.exprlist:
+            return None
+
+        row = expr.row
+        key = (expr.col, expr.index)
+        for nexpr in self.exprlist[rowstate]:
+            if nexpr.row==row and (nexpr.col, nexpr.index) > key:
+                return nexpr
 
         return None
-    def successstate(self, pos):
-        """
-        成功した場合
+    def nextexpr(self, rowstate, expr):
+        if rowstate not in self.exprlist:
+            return None
 
-        行の状態は同じでこれよりあとの行か、次の列
-        """
-        idxincol = pos.idxincol
-        rowstate = pos.rowstate
-        k = (pos.col, idxincol)
-        for pos2 in self:
-            if pos2.rowstate != rowstate: continue
-            if (pos2.col, pos2.idxincol) > k: 
-                return pos2
+        k = (expr.col, expr.row, expr.index)
+        for nexpr in self.exprlist[rowstate]:
+            if (nexpr.col, nexpr.row, nexpr.index) > k:
+                return nexpr
 
         return None
-    def failstate(self, pos):
-        """
-        失敗した場合
 
-        行の状態を失敗にして、同じ列でこれよりあとの行か、次の列を検索
-        """
-        rowid = pos[1]
-        rowstate = pos[0] - (1<<rowid)
-        k = (pos[2], rowid) # col, row
-        for pos2 in self:
-            if pos2[0]==rowstate and (pos2[2], pos2[1]) > k:
-                return pos2
+    def add(self, rowstate, expr):
+        if not self.exprlist:
+            self.set_start(rowstate, expr)
+        if rowstate not in self.exprlist:
+            self.exprlist[rowstate] = []
 
-        return None
-    def __getitem__(self, idx):
-        return self.poslist[idx]
-    def __len__(self):
-        return len(self.poslist)
-    def __iter__(self):
-        return iter(self.poslist)
-    def add(self, pos):
-        if pos in self.posdict: return
-        if not self.poslist:
-            self.set_start(pos)
-
-        self.poslist.append(pos)
+        self.exprlist[rowstate].append(expr)
 
 class EngineFactory():
     engineclass = Engine
@@ -177,14 +157,18 @@ class EngineFactory():
     @classmethod
     def set_engineclass(cls, class_):
         cls.engineclass = class_
+    def fexpr(self, expr):
+        for k, v in self.opids.items():
+            if v==expr.id:
+                return k
     def compile_query(self, expr):
         expr = expr.minimalize()
         colids = expr.columns()
         opcodes = expr._construct()
         return self.construct(opcodes, colids)
-    def dict2table(self, poslist, colids, dic):
+    def dict2table(self, exprlist, colids, dic):
         res = []
-        last = max(self.FAIL, poslist.state)
+        last = max(self.FAIL, exprlist.state)
         for i in range(last+1):
             res.append([0 for col in colids])
 
@@ -206,61 +190,61 @@ class EngineFactory():
         start = self.START
         success = self.SUCCESS
         fail = self.FAIL
-        poslist = PosList(0, excludes={1,2})
-        self._construct_poslist(opcodes.table, colids, poslist)
-        self._construct_table(poslist, start, success, fail)
-        expr_table = self.dict2table(poslist, colids, self.expr_table)
+        exprlist = ExprList(0, excludes={1,2})
+        self._construct_exprlist(opcodes.table, colids, exprlist)
+        self._construct_table(exprlist, start, success, fail)
+        expr_table = self.dict2table(exprlist, colids, self.expr_table)
         exprs = self.opids.items()
         exprs.sort(key=lambda x:x[1])
         exprs = [None]+[k for k, v in exprs]
-        success_table = self.dict2table(poslist, colids, self.success_table)
-        fail_table = self.dict2table(poslist, colids, self.fail_table)
+        success_table = self.dict2table(exprlist, colids, self.success_table)
+        fail_table = self.dict2table(exprlist, colids, self.fail_table)
         klass = self.engineclass
         return klass(start, success, fail, exprs, expr_table, success_table, fail_table)
-    def _construct_poslist(self, table, colids, poslist):
+    def _construct_exprlist(self, table, colids, exprlist):
+        table = filter(None, table)
         rowstates = range(0, 2**len(table)+1)
         rowstates.reverse()
         for rowstate in rowstates:
             for colname, colid in colids:
-                idxincol = 0
+                index = 0
                 for rowid, row in enumerate(table):
                     if ((rowstate >> rowid) & 1)==0: continue
                     if colname not in row: continue
                     exprs = row[colname]
                     for ops in exprs:
                         opid = self.opids[ops]
-                        pos = Position(rowstate, rowid, colid, idxincol, opid)
-                        poslist.add(pos)
-                        idxincol += 1
+                        expr = ExprNode(colid, rowid, index, opid)
+                        exprlist.add(rowstate, expr)
+                        index += 1
 
-    def _construct_table(self, poslist, start, success, fail):
-        if not poslist: return
-        que = deque([(start, poslist[0])])
+    def _construct_table(self, exprlist, start, success, fail):
+        if not exprlist: return
+        rowstate, expr = exprlist.startnode
+        que = deque([(start, rowstate, expr)])
         while que:
-            state, pos = que.popleft()
-            rowstate, rowid, col, idxincol, opid = pos
+            state, rowstate, expr = que.popleft()
+            col, row, index, opid = expr
             self.expr_table[col, state] = opid
             # 失敗の場合
-            npos = poslist.failstate(pos)
-            if npos:
-                nstate = poslist.new_state(npos)
+            newrowstate = rowstate - (1<<row)
+            nexpr = exprlist.nextexpr(newrowstate, expr)
+            if nexpr:
+                nstate = exprlist.new_state(newrowstate, nexpr.index)
                 self.fail_table[col, state] = nstate
-                que.append((nstate, npos))
+                que.append((nstate, newrowstate, nexpr))
             else:
                 # 次がないので終了
                 self.fail_table[col, state] = fail
 
             # 成功の場合
-            right = poslist.findright(pos)
-            if not right:
+            right = exprlist.findright(rowstate, expr)
+            if right:
+                # 次に評価する式を探す
+                nexpr = exprlist.nextexpr(rowstate, expr)
+                nstate = exprlist.new_state(rowstate, nexpr.index)
+                self.success_table[col, state] = nstate
+                que.append((nstate, rowstate, nexpr))
+            else:
                 # この行にこれ以上式がないので成功すれば終了
                 self.success_table[col, state] = success
-            else:
-                # 次に評価する式を探す
-                npos = poslist.successstate(pos)
-                if npos:
-                    nstate = poslist.new_state(npos)
-                    self.success_table[col, state] = nstate
-                    que.append((nstate, npos))
-                else:
-                    self.success_table[col, state] = success

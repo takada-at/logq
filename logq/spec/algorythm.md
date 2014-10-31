@@ -24,7 +24,11 @@ logqでは、まずこの論理式を簡単化する。
 ## 条件式をテーブルに変換
 この段階で条件式は、1つ以上のand式が、orで結ばれた形になっている。
 
-以下の表の各行はand節に対応している。
+以下の表の各行はand節に対応している。列はカラムに対応している。
+
+```
+(cols[1]=='hoge') or (cols[2]=='fuga' and cols[4]=='poyo') or (cols[2]=='hogera' and cols[5]=='piyo')
+```
 
 |     |cols[1]|cols[2]|cols[4]|cols[5]|
 |:----|:-----|:------|:-------|:------|
@@ -45,17 +49,17 @@ logqでは、まずこの論理式を簡単化する。
 
 このアルゴリズムは以下のような3つの表として表現できる。
 
-* 現在の状態×今読んでいるカラムから、適用すべき式を決定する表
-* 現在の状態×今読んでいるカラムから、式が成功であった場合に遷移すべき状態を決定する表
-* 現在の状態×今読んでいるカラムから、式が失敗であった場合に遷移すべき状態を決定する表
+* 現在の状態×今読んでいるカラムから、適用すべき式を決定する表(式決定表)
+* 現在の状態×今読んでいるカラムから、式が成功であった場合に遷移すべき状態を決定する表(成功状態表)
+* 現在の状態×今読んでいるカラムから、式が失敗であった場合に遷移すべき状態を決定する表(失敗状態表)
 
-* 状態は以下の2つによって決まる
+* 状態は以下の2つに対して一意であればよい
     * 各行の状態
         * 各行の式がひとつでも失敗すればFalse。まだ失敗していなければTrue。
     * カラムの何番目の式か
         * 状態×カラムによって、一意に適用すべき式が決まるようにするために、同じカラムに対して複数の式がある場合は別の状態を割りふる
 
-例えば上の表は以下のような状態遷移になる。1は判定成功、2は判定失敗
+例えば上の表は以下のような状態遷移になる。1は成功確定、2は失敗確定をしめす状態。
 
 ※各セル内は、(式、成功後の状態、失敗後の状態)
 
@@ -71,6 +75,7 @@ logqでは、まずこの論理式を簡単化する。
 
 ![状態遷移]('algorythm.png')
 
+
 ## 状態遷移表のつくり方
 検索条件から状態遷移表を作るアルゴリズムをまとめる。
 
@@ -80,30 +85,7 @@ logqでは、まずこの論理式を簡単化する。
 |条件2 |      |=fuga  |=poyo   |       |
 |条件3 |      |=hogera|        | =piyo |
 
-条件内のand節は3つある。また、cols[2]に適用すべき式が2つあるので、可能な状態の集合は以下のようになる。
-
-|条件1 | 条件2 | 条件3   |式インデックス|
-|:-----|:------|:-------|:------|
-| True | True  | True   | 0     |
-| True | True  | True   | 1     |
-|False | True  | True   | 0     |
-|False | True  | True   | 1     |
-|True | False  | True   | 0     |
-|True | False  | True   | 1     |
-|True | True  | False   | 0     |
-|True | True  | False   | 1     |
-|False | False  | True   | 0     |
-|False | Flase  | True   | 1     |
-|True | False  | False   | 0     |
-|True | Flase  | False   | 1     |
-|False | True  | False   | 0     |
-|False | True  | False   | 1     |
-|False | False  | False   | 0     |
-|False | False | False   | 1     |
-|成功確定 | 成功確定 | 成功確定 | 成功確定 |
-|失敗確定 | 失敗確定 | 失敗確定 | 失敗確定 |
-
-ただし実際には使われない状態もある。
+条件内のand節は3つある。また、cols[2]に適用すべき式が2つあるので、可能な状態の数は2の3乗×2+失敗確定+成功確定で、18。ただし実際には使われない状態もある。
 
 状態遷移表作成のための疑似コードは以下のようになる。
 
@@ -113,19 +95,19 @@ start = 0
 success = 1
 fail = 2
 # 式のリストを作っておく
-exprlist = makeexplist()
+exprlist = make_explist()
 # 各行の状態。すべての行をTrueにして初期化
-rowstate = makerowstate()
+rowstate = new_rowstate()
 
-expr_table = new Table()
-success_table = new Table()
-fail_table = new Table()
+expr_table = new_table()
+success_table = new_table()
+fail_table = new_table()
 que = [(start, rowstate, exprlist[0])]
 while que:
     state, rowstate, expr = que.popleft()
     # 行と列を取得
-    col = expr.col
     row = expr.row
+    col = expr.col
     # 式のIDを式決定表に入れる
     expr_table[col, state] = expr.id
     # 失敗の場合
@@ -145,7 +127,7 @@ while que:
 
     # 成功の場合
     # 同じ行で、これより右に式があるか検索
-    nexpr = exprlist.findright(expr)
+    nexpr = exprlist.findright(rowstate, expr)
     if not nexpr:
          # この行にこれ以上式がないので成功すれば、成功確定となる
          success_table[col, state] = success

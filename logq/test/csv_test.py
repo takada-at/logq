@@ -74,7 +74,7 @@ def test_csv2():
 
     tmp.seek(0)
     q2 = (col[1].contains('og')) & (col[2]=="fuga") & (col[4]=="poyo") | (col[2]=="hogera") & (col[5]=="piyo")
-    eng = ef.compile_query(q)
+    eng = ef.compile_query(q2)
     colmap = q.col_list()
     parser = engine.CSVParser(eng, tmp, colmap)
 

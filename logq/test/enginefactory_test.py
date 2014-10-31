@@ -5,7 +5,6 @@ from .. import expr as e
 
 def test_EngineFactory():
     reload(ef)
-    fac = ef.EngineFactory()
     ef.EngineFactory.set_engineclass(ef.PyEngine)
     col = [e.Column(i) for i in range(10)]
     q = (col[1]=="hoge") & (col[2]=="fuga") & (col[4]=="poyo") | (col[2]=="hogera") & (col[5]=="piyo")
@@ -16,7 +15,6 @@ def test_EngineFactory():
     print(eng.format())
     state = 0
     col = colids[1]
-
     op = eng.exprs
     # 最初は =hoge
     a = eng.expr_table[state][col]
@@ -25,11 +23,9 @@ def test_EngineFactory():
     # 成功したら次は =fuga or =hogera
     state = eng.success_table[state][col]
     col = colids[2]
-    print(col)
     a = eng.expr_table[state][col]
     assert ('=', 'fuga') == op[ a ] or ('=', 'hogera') == op[ a ]
 
-    # 成功しても失敗しても次は = hogera
     if op[a] == ('=', 'fuga'):
         state0 = eng.success_table[state][col]
         state1 = eng.fail_table[state][col]
@@ -87,18 +83,15 @@ def test_Engine():
 
 def test_EngineFactory2():
     reload(ef)
-    fac = ef.EngineFactory()
     ef.EngineFactory.set_engineclass(ef.PyEngine)
     col = [e.Column(i) for i in range(10)]
     q = (col[0]=="a")
     eng = ef.compile_query(q)
-    colids = {colname: cid for cid, colname in enumerate((1,2,4,5))}
     assert eng
     print(eng.format())
 
 def test_EngineFactory3():
     reload(ef)
-    fac = ef.EngineFactory()
     ef.EngineFactory.set_engineclass(ef.PyEngine)
     col = [e.Column(i) for i in range(10)]
     q = (col[2] >= "hoge") & (col[0]=='a') & (col[2]<='hoge')
@@ -110,7 +103,6 @@ def test_EngineFactory3():
 def test_EngineFactory4():
     cols = [e.Column(i) for i in range(10)]
     q = (cols[1]=='hoge') | (cols[2]=='fuga') & (cols[4]=='poyo') | (cols[2]=='hogera') & (cols[5]=='piyo')
-    fac = ef.EngineFactory()
     ef.EngineFactory.set_engineclass(ef.PyEngine)
     eng = ef.compile_query(q)
     assert eng
@@ -120,9 +112,9 @@ def test_EngineFactory4():
 def test_EngineFactory5():
     cols = [e.Column(i) for i in range(10)]
     q = (cols[0] >= '2014-10-03 12:00:00') & (cols[0] < '2014-10-03 12:02:00') & (cols[1]=='hoge')
-    fac = ef.EngineFactory()
     ef.EngineFactory.set_engineclass(ef.PyEngine)
     eng = ef.compile_query(q)
+    print(q)
     print(eng.format())
     data = [
         ["2014-10-03 12:00:11", "hoge"],
