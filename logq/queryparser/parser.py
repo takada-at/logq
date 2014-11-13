@@ -109,4 +109,9 @@ def parse(f):
     parser.restart()
     return ret
 
+def parses(s):
+    ret = parser.parse(s)
+    parser.restart()
+    return ret
+
 

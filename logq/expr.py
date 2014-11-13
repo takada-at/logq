@@ -39,9 +39,9 @@ class Expr(Bool):
         colnames.sort()
         colids = [(colname, colid) for colid, colname in enumerate(colnames)]
         return colids
-    def col_list(self):
+    def col_list(self, coltype=int):
         variables = filter(lambda x:isinstance(x, BinOp), self.variables)
-        colnames = list({v.colname for v in variables})
+        colnames = list({coltype(v.colname) for v in variables})
         colnames.sort()
         if not colnames:
             return []
