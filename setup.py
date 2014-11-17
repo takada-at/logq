@@ -19,6 +19,7 @@ setup(name='logq',
       description='',
       author='takada-at',
       author_email='takada-at@klab.com',
+      scripts=['scripts/logqsearch.py'],
       packages=find_packages(),
       ext_modules=[
           Extension('logq.engine', 
