@@ -29,6 +29,7 @@ t_OR = r'OR'
 t_AND = r'AND'
 t_NOT = r'NOT'
 
+
 def t_COLUMN(t):
     r'\$(?P<col>[a-zA-Z0-9\-_]+)'
     stval = t.lexer.lexmatch.group('col')
@@ -38,7 +39,9 @@ def t_COLUMN(t):
 
 def t_ID(t):
     r'[a-zA-Z_][a-zA-Z0-9\-_]*'
-    t.type = reserved.get(t.value,'ID')
+    t.type = reserved.get(t.value.upper(),'ID')
+    if t.type!='ID':
+        t.value = t.value.upper()
     return t
 
 def t_STRING(t):

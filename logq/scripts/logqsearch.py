@@ -23,6 +23,7 @@ def expr(string):
 def search(path, expr, fileformat):
     ftype = logf(fileformat)
     logobj = ftype(open(path))
+    print(expr)
     for row in logobj.search(expr):
         print(row)
 

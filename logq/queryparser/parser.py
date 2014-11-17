@@ -5,6 +5,7 @@ __DIR__ = os.path.abspath(os.path.dirname(__file__))
 
 import ply.yacc as yacc
 from .lexer import tokens
+from .lexer import lexer
 tokens
 
 DEBUG = 0
@@ -105,12 +106,12 @@ start = str('expr')
 parser = yacc.yacc(outputdir=__DIR__, debug=DEBUG, write_tables=False)
 
 def parse(f):
-    ret = parser.parse(f.read())
+    ret = parser.parse(f.read(), lexer=lexer)
     parser.restart()
     return ret
 
 def parses(s):
-    ret = parser.parse(s)
+    ret = parser.parse(s, lexer=lexer)
     parser.restart()
     return ret
 
