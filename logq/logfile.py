@@ -30,7 +30,7 @@ class CSVFile(LogFile):
 
     def _create_parser(self, engine, colmap, fileobject):
         delimiter = bytes(self._params.get('delimiter', ','))
-        quotechar = bytes(self._params.get('delimiter', '"'))
+        quotechar = bytes(self._params.get('quotechar', '"'))
         return self.parser(engine, fileobject, colmap, delimiter=delimiter, quotechar=quotechar)
 
 class LTSVFile(LogFile):

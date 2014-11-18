@@ -20,9 +20,9 @@ def expr(string):
 
     return exprobj
 
-def search(path, expr, fileformat):
+def search(path, expr, fileformat, sep, quote):
     ftype = logf(fileformat)
-    logobj = ftype(open(path))
+    logobj = ftype(open(path), delimiter=sep, quotechar=quote)
     print(expr)
     for row in logobj.search(expr):
         print(row)
@@ -35,7 +35,7 @@ def main():
     parser.add_argument('path')
     parser.add_argument('expr', type=expr)
     args = parser.parse_args()
-    search(args.path, args.expr, args.format)
+    search(args.path, args.expr, args.format, args.sep, args.quote)
 
 if __name__=='__main__':
     main()

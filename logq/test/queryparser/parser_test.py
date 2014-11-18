@@ -20,3 +20,6 @@ def test_parser2():
     l = parser.parser.parse(s)
     print(l)
     assert l
+    r = l.col_list()
+    print(r)
+    assert r[1]==0
